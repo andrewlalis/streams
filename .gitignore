@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/ranges
+ranges.so
+ranges.dylib
+ranges.dll
+ranges.a
+ranges.lib
+ranges-test-*
+*.exe
+*.o
+*.obj
+*.lst
+libranges.a

@@ -1,0 +1,9 @@
+{
+	"authors": [
+		"Andrew Lalis"
+	],
+	"copyright": "Copyright © 2023, Andrew Lalis",
+	"description": "A collection of useful ranges.",
+	"license": "MIT",
+	"name": "ranges"
+}
