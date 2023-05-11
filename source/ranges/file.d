@@ -18,6 +18,8 @@ class FileInputRange : ReadableRange, ClosableRange {
         this(File(filename, "rb"));
     }
 
+    alias read = ReadableRange.read;
+
     override int read(ref ubyte[] buffer, uint offset, uint length) {
         if (!this.file.isOpen() || buffer.length < 1 || offset + length > buffer.length) {
             return -1;
@@ -58,6 +60,8 @@ class FileOutputRange : WritableRange, ClosableRange {
     public this(string filename) {
         this(File(filename, "wb"));
     }
+
+    alias write = WritableRange.write;
 
     override int write(ref ubyte[] buffer, uint offset, uint length) {
         if (!this.file.isOpen() || buffer.length < 1 || offset + length > buffer.length) {

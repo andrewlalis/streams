@@ -135,6 +135,20 @@ abstract class WritableRange {
         return write(buffer, 0, cast(uint) buffer.length);
     }
 
+    int write(T)(ref T buffer, uint offset, uint length) if (isStaticArray!T) {
+        if (buffer.length < 1) return 0;
+        ubyte[] data = buffer[];
+        return write(data, offset, length);
+    }
+
+    int write(T)(ref T buffer, uint offset) if (isStaticArray!T) {
+        return write(buffer, offset, buffer.length - offset);
+    }
+
+    int write(T)(ref T buffer) if (isStaticArray!T) {
+        return write(buffer, 0, buffer.length);
+    }
+
     /** 
      * Writes bytes to this range, using the standard OutputRange "put" method
      * for compatibility with D's OutputRanges. Throws an exception if not all

@@ -1,3 +1,7 @@
+/**
+ * This module defines the `DataInputRange` and `DataOutputRange` as utility
+ * ranges for reading and writing primitive values and arrays.
+ */
 module ranges.data;
 
 import ranges.base;
@@ -9,6 +13,8 @@ class DataInputRange : FilteredReadableRange {
     this(ReadableRange range) {
         super(range);
     }
+
+    alias read = FilteredReadableRange.read;
 
     T read(T)() {
         static if (isSomeString!T) {
@@ -68,7 +74,12 @@ class DataInputRange : FilteredReadableRange {
             try {
                 data[i] = readPrimitive!ElementType();
             } catch (RangeException e) {
-                throw e;
+                import std.format;
+                throw new RangeException(format!
+                    "Failed to read static array element %d of %d, of type %s."
+                    (i + 1, T.length, ElementType.stringof),
+                    e
+                );
             }
         }
         return data;
@@ -80,16 +91,22 @@ class DataOutputRange : FilteredWritableRange {
         super(range);
     }
 
+    alias write = FilteredWritableRange.write;
+
     void write(T)(T value) {
         static if (isSomeString!T) {
-            assert(false, "Cannot write strings.");
+            writeArray!(char[])(cast(char[]) value);
+        } else static if (isStaticArray!T) {
+            writeStaticArray!T(value);
+        } else static if (isArray!T) {
+            writeArray!T(value);
         } else {
             writePrimitive!T(value);
         }
     }
 
     private void writePrimitive(T)(T value) {
-        const byteSize = T.sizeof;
+        const uint byteSize = T.sizeof;
         union U { T value; ubyte[byteSize] bytes; }
         U u;
         u.value = value;
@@ -97,30 +114,137 @@ class DataOutputRange : FilteredWritableRange {
         if (bytesWritten != byteSize) {
             import std.format;
             throw new RangeException(format!
-                "Failed to write value of type %s (%d bytes, value = %s) to range. Write %d bytes instead.",
+                "Failed to write value of type %s (%d bytes, value = %s) to range. Wrote %d bytes instead."
                 (T.stringof, byteSize, value, bytesWritten)
             );
         }
     }
+
+    private void writeArray(T)(T value) if (isArray!T) {
+        try {
+            writePrimitive!uint(cast(uint) value.length);
+        } catch (RangeException e) {
+            import std.format;
+            throw new RangeException("Failed to write array size uint.");
+        }
+        if (value.length == 0) return;
+        alias ElementType = typeof(value[0]);
+        for (uint i = 0; i < value.length; i++) {
+            try {
+                writePrimitive!ElementType(value[i]);
+            } catch (RangeException e) {
+                import std.format;
+                throw new RangeException(format!
+                    "Failed to write array element %d of %d, of type %s."
+                    (i + 1, value.length, ElementType.stringof),
+                    e
+                );
+            }
+        }
+    }
+
+    private void writeStaticArray(T)(T value) if (isStaticArray!T) {
+        static if (T.length == 0) return;
+        alias ElementType = typeof(*T.init.ptr);
+        for (uint i = 0; i < T.length; i++) {
+            try {
+                writePrimitive!ElementType(value[i]);
+            } catch (RangeException e) {
+                import std.format;
+                throw new RangeException(format!
+                    "Failed to write static array element %d of %d, of type %s."
+                    (i + 1, T.length, ElementType.stringof),
+                    e
+                );
+            }
+        }
+    }
 }
 
+// Tests for DataInputRange
 unittest {
     import ranges;
     import std.format;
-    DataInputRange dIn = new DataInputRange(new ByteArrayInputRange([0, 0, 0, 0]));
-    assert(dIn.read!int == 0);
-    dIn = new DataInputRange(new ByteArrayInputRange([1]));
-    assert(dIn.read!bool == true);
 
-    ubyte[] buffer = cast(ubyte[]) [12, 0, 0, 0] ~ cast(ubyte[]) "Hello world!";
-    dIn = new DataInputRange(new ByteArrayInputRange(buffer));
-    assert(dIn.read!string == "Hello world!");
-    ubyte[] buffer2 = [4, 0, 0, 0, 1, 2, 3, 4];
-    dIn = new DataInputRange(new ByteArrayInputRange(buffer2));
-    assert(dIn.read!(ubyte[]) == [1, 2, 3, 4]);
+    DataInputRange getInputRange(ubyte[] buffer) {
+        return new DataInputRange(new ByteArrayInputRange(buffer));
+    }
 
-    ubyte[] buffer3 = [1, 2, 3, 4];
-    dIn = new DataInputRange(new ByteArrayInputRange(buffer3));
-    ubyte[4] output = dIn.read!(ubyte[4])();
-    assert(output == [1, 2, 3, 4]);
+    DataInputRange din;
+
+    // Test reading some integers.
+    union IntUnion { int value; ubyte[4] bytes; }
+    int[] testValues = [int.min, -1, 0, 1, 42, int.max];
+    foreach (value; testValues) {
+        IntUnion u;
+        u.value = value;
+        din = getInputRange(u.bytes[]);
+        assert(din.read!int() == value);
+    }
+    // Try all at once.
+    ubyte[] buffer;
+    foreach (value; testValues) {
+        IntUnion u;
+        u.value = value;
+        buffer ~= u.bytes[];
+    }
+    din = getInputRange(buffer);
+    foreach (value; testValues) {
+        assert(din.read!int() == value);
+    }
+
+    // Test some booleans.
+    din = getInputRange([0, 1, 43, ubyte.max]);
+    assert(din.read!bool() == false);
+    assert(din.read!bool() == true);
+    assert(din.read!bool() == true);
+    assert(din.read!bool() == true);
+
+    // Test reading a static array (aka no length prefix)
+    float[3] vec = [0.5, 1.0, 0.75];
+    buffer = [];
+    union FloatUnion { float value; ubyte[4] bytes; }
+    foreach (value; vec) {
+        FloatUnion u;
+        u.value = value;
+        buffer ~= u.bytes[];
+    }
+    din = getInputRange(buffer);
+    float[3] outputVec = din.read!(float[3])();
+    assert(outputVec == vec);
+
+    // Test reading an array (with length prefix)
+    buffer = [];
+    IntUnion sizeUnion;
+    sizeUnion.value = cast(int) testValues.length;
+    buffer ~= sizeUnion.bytes[];
+    foreach (value; testValues) {
+        IntUnion u;
+        u.value = value;
+        buffer ~= u.bytes[];
+    }
+    din = getInputRange(buffer);
+    int[] readTestValues = din.read!(int[])();
+    assert(readTestValues == testValues);
+
+    // Test reading a string.
+    buffer = cast(ubyte[]) [12, 0, 0, 0] ~ cast(ubyte[]) "Hello world!";
+    din = getInputRange(buffer);
+    assert(din.read!string == "Hello world!");
+
+
+    // Tests for DataOutputRange
+    auto r = new ByteArrayOutputRange();
+    DataOutputRange dout = new DataOutputRange(r);
+    dout.write!long(123_456_789_101_123);
+    buffer = r.toArray();
+    din = getInputRange(buffer);
+    assert(din.read!long() == 123_456_789_101_123);
+
+    r = new ByteArrayOutputRange();
+    dout = new DataOutputRange(r);
+    dout.write!(int[])(testValues);
+    buffer = r.toArray();
+    din = getInputRange(buffer);
+    assert(din.read!(int[]) == testValues);
 }
