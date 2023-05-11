@@ -177,6 +177,14 @@ interface ClosableRange {
 }
 
 /** 
+ * An interface for writable ranges, to indicate that they provide a flush
+ * mechanism for flushing buffered writes to some resource.
+ */
+interface FlushableRange {
+    void flush();
+}
+
+/** 
  * An exception that may be thrown if an illegal operation or error occurs
  * while working with any of the ranges defined in this library.
  */

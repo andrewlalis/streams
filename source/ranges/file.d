@@ -10,11 +10,11 @@ import std.stdio : File;
 class FileInputRange : ReadableRange, ClosableRange {
     private File file;
 
-    public this(File file) {
+    this(File file) {
         this.file = file;
     }
 
-    public this(string filename) {
+    this(string filename) {
         this(File(filename, "rb"));
     }
 
@@ -29,7 +29,11 @@ class FileInputRange : ReadableRange, ClosableRange {
         return cast(int) readSlice.length;
     }
 
-    public void close() {
+    void flush() {
+        this.file.flush();
+    }
+
+    void close() {
         if (this.file.isOpen()) {
             this.file.close();
         }
@@ -50,14 +54,14 @@ unittest {
 /** 
  * A writable range for writing to files.
  */
-class FileOutputRange : WritableRange, ClosableRange {
+class FileOutputRange : WritableRange, ClosableRange, FlushableRange {
     private File file;
 
-    public this(File file) {
+    this(File file) {
         this.file = file;
     }
 
-    public this(string filename) {
+    this(string filename) {
         this(File(filename, "wb"));
     }
 
@@ -72,7 +76,11 @@ class FileOutputRange : WritableRange, ClosableRange {
         return cast(int) slice.length;
     }
 
-    public void close() {
+    void flush() {
+        this.file.flush();
+    }
+
+    void close() {
         if (this.file.isOpen()) {
             this.file.close();
         }
