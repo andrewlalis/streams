@@ -10,6 +10,18 @@ abstract class FilteredReadableRange : ReadableRange {
     }
 
     override int read(ref ubyte[] buffer, uint offset, uint length) {
-        return 0;
+        return this.range.read(buffer, offset, length);
+    }
+}
+
+abstract class FilteredWritableRange : WritableRange {
+    protected WritableRange range;
+
+    this(WritableRange range) {
+        this.range = range;
+    }
+
+    override int write(ref ubyte[] buffer, uint offset, uint length) {
+        return this.range.write(buffer, offset, length);
     }
 }

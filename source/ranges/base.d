@@ -161,3 +161,13 @@ unittest {
 interface ClosableRange {
     void close();
 }
+
+/** 
+ * An exception that may be thrown if an illegal operation or error occurs
+ * while working with any of the ranges defined in this library.
+ */
+class RangeException : Exception {
+    import std.exception;
+
+    mixin basicExceptionCtors;
+}

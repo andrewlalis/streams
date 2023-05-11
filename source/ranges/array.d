@@ -20,7 +20,7 @@ class ByteArrayInputRange : ReadableRange {
         }
         uint lengthToRead = cast(uint) this.source.length - this.currentIndex;
         if (lengthToRead > length) lengthToRead = length;
-        buffer[offset .. offset + lengthToRead] = this.source[this.currentIndex .. lengthToRead];
+        buffer[offset .. offset + lengthToRead] = this.source[this.currentIndex .. this.currentIndex + lengthToRead];
         this.currentIndex += lengthToRead;
         return lengthToRead;
     }
