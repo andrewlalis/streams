@@ -79,6 +79,38 @@ bool isSomeInputStream(StreamType)() {
     }
 }
 
+bool isSomeInputStream2(S)() {
+    return hasMember!(S, "read") &&
+        isCallable!(S.read) &&
+        Parameters!(S.read).length == 1 &&
+        is(ReturnType!(S.read) == int) &&
+        isDynamicArray!(Parameters!(S.read)[0]);
+}
+
+unittest {
+    struct S1 {
+        int read(ubyte[] buffer) {
+            int sum = 0;
+            foreach (n; buffer) sum += n;
+            return sum;
+        }
+
+        int write(ubyte[] buffer) {
+            return 0;
+        }
+    }
+    assert(isSomeInputStream2!S1);
+    S1 s1;
+    ubyte[] buffer = [1, 2, 3];
+    import core.stdc.stdlib;
+    ubyte* ptr = cast(ubyte*) malloc(3 * ubyte.sizeof);
+    ptr[0] = 1;
+    ptr[1] = 2;
+    ptr[2] = 3;
+    assert(s1.read(buffer) == 6);
+    assert(s1.read(ptr[0..3]) == 6);
+}
+
 /** 
  * Determines if the given template argument is some form of output stream.
  * ```d

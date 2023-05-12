@@ -1,32 +1,22 @@
+/** 
+ * A collection of helper functions that augment the basic `read` and `write`
+ * functions of input and output streams.
+ */
 module streams.functions;
 
 import streams.primitives;
 
 import std.traits;
 
-/** 
- * Asserts that the given arguments are valid for a typical input or output
- * stream operation.
+/**
+ * Reads from a stream into a buffer, from the given offset until the end of
+ * the buffer.
  * Params:
- *   buffer = A reference to the buffer.
+ *   stream = The stream to read from.
+ *   buffer = The buffer to read to.
  *   offset = The offset in the buffer.
- *   length = The length to read or write in the buffer.
+ * Returns: The number of elements to read.
  */
-void assertValidStreamArgs(DataType)(ref DataType[] buffer, uint offset, uint length) {
-    assert(
-        buffer.length > 0,
-        "Buffer length should be greater than 0."
-    );
-    assert(
-        offset < buffer.length,
-        "Offset should be less than the buffer's length."
-    );
-    assert(
-        offset + length <= buffer.length,
-        "Offset + length should be no greater than the buffer's length."
-    );
-}
-
 int read(StreamType, DataType)(
     ref StreamType stream,
     ref DataType[] buffer,
@@ -55,6 +45,14 @@ int read(StreamType, DataType)(
     return read(stream, buffer, 0);
 }
 
+/**
+ * Continously reads an input stream into an in-memory buffer, until 0 elements
+ * could be read, or an error occurs.
+ * Params:
+ *   stream = The stream to read from.
+ *   bufferSize = The size of the internal buffer to use for reading.
+ * Returns: The full contents of the stream.
+ */
 DataType[] readAll(StreamType, DataType)(
     ref StreamType stream,
     uint bufferSize = 8192
