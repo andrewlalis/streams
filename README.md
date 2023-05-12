@@ -1,2 +1,3 @@
-# ranges
-A collection of useful input and output ranges for D.
+# Streams
+A collection of useful stream primitives and implementations. Designed to be a candidate for inclusion in Phobos.
+

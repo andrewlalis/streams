@@ -3,7 +3,7 @@
 		"Andrew Lalis"
 	],
 	"copyright": "Copyright © 2023, Andrew Lalis",
-	"description": "A collection of useful ranges.",
+	"description": "A collection of useful stream primitives and implementations.",
 	"license": "MIT",
-	"name": "ranges"
+	"name": "streams"
 }

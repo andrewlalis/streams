@@ -13,4 +13,4 @@ ranges-test-*
 *.o
 *.obj
 *.lst
-libranges.a
+streams-test-library
