@@ -2,6 +2,14 @@ module streams.primitives;
 
 import std.traits;
 
+/** 
+ * Determines if the given template argument is some form of input stream, such
+ * that it offers a `read` function where `DataType` is any type:
+ * ```d
+ * int read(ref DataType[] buffer, uint offset, uint length)
+ * ```
+ * Returns: True if the given argument is an input stream type, or false otherwise.
+ */
 bool isSomeInputStream(StreamType)() {
     static if (hasMember!(StreamType, "read") && isCallable!(StreamType.read)) {
         alias readFunction = StreamType.read;
@@ -25,6 +33,14 @@ bool isSomeInputStream(StreamType)() {
     }
 }
 
+/** 
+ * Determines if the given template argument is some form of output stream,
+ * such that it offers a `write` function where `DataType` is any type:
+ * ```d
+ * int write(ref DataType[] buffer, uint offset, uint length)
+ * ```
+ * Returns: True if the given argument is an output stream type, or false otherwise.
+ */
 bool isSomeOutputStream(StreamType)() {
     static if (hasMember!(StreamType, "write") && isCallable!(StreamType.write)) {
         alias writeFunction = StreamType.write;
@@ -51,7 +67,6 @@ bool isSomeOutputStream(StreamType)() {
 /** 
  * Determines if the given template argument is an input stream type; that is,
  * one with a function like so:
- *
  * ```d
  * int read(ref ubyte[] buffer, uint offset, uint count)
  * ```
