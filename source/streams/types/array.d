@@ -46,12 +46,12 @@ struct ArrayOutputStream(DataType) {
     private Appender!(DataType[]) app;
 
     int write(ref DataType[] buffer, uint offset, uint length) {
-        app ~= buffer[offset .. offset + length];
+        this.app ~= buffer[offset .. offset + length];
         return length;
     }
 
     DataType[] toArray() {
-        return app[];
+        return this.app[];
     }
 }
 
@@ -66,4 +66,10 @@ unittest {
     buffer = [2, 2.5, 3];
     assert(s1.write(buffer, 0, 3) == 3);
     assert(s1.toArray() == [0.5, 1, 1.5, 2, 2.5, 3]);
+
+    auto s2 = ArrayOutputStream!ubyte();
+    ubyte[] buffer1 = [1, 2, 3];
+    s2.write(buffer1, 0, 3);
+    ubyte[] data = s2.toArray();
+    assert(data == [1, 2, 3]);
 }

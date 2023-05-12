@@ -229,6 +229,14 @@ bool isSomeStream(StreamType, DataType)() {
     return isInputStream!(StreamType, DataType) || isOutputStream(StreamType, DataType);
 }
 
+bool isByteInputStream(StreamType)() {
+    return isInputStream!(StreamType, ubyte);
+}
+
+bool isByteOutputStream(StreamType)() {
+    return isOutputStream!(StreamType, ubyte);
+}
+
 /** 
  * Determines if the given template argument is a closable stream type, which
  * provides the following function:
@@ -327,4 +335,14 @@ unittest {
     assert(!isFlushableStream!S2);
     struct S3 {}
     assert(!isFlushableStream!S3);
+}
+
+/** 
+ * An exception that may be thrown if an illegal operation or error occurs
+ * while working with streams.
+ */
+class StreamException : Exception {
+    import std.exception;
+
+    mixin basicExceptionCtors;
 }
