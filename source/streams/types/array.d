@@ -1,5 +1,11 @@
+/** 
+ * A collection of array-backed streams for in-memory reading and writing.
+ */
 module streams.types.array;
 
+/** 
+ * An input stream that reads from an array of items.
+ */
 struct ArrayInputStream(DataType) {
     private DataType[] array;
     private uint currentIndex = 0;
@@ -30,16 +36,34 @@ unittest {
     assert(buffer == [5, 4]);
 }
 
+/** 
+ * An output stream that writes to an internal array. The resulting array can
+ * be obtained with `toArray()`.
+ */
 struct ArrayOutputStream(DataType) {
     import std.array : Appender, appender;
 
-    private Appender!DataType app;
+    private Appender!(DataType[]) app;
 
     int write(ref DataType[] buffer, uint offset, uint length) {
         app ~= buffer[offset .. offset + length];
+        return length;
     }
 
     DataType[] toArray() {
         return app[];
     }
+}
+
+unittest {
+    import streams.primitives;
+
+    assert(isSomeOutputStream!(ArrayOutputStream!bool));
+
+    auto s1 = ArrayOutputStream!float();
+    float[] buffer = [0.5, 1, 1.5];
+    assert(s1.write(buffer, 0, 3) == 3);
+    buffer = [2, 2.5, 3];
+    assert(s1.write(buffer, 0, 3) == 3);
+    assert(s1.toArray() == [0.5, 1, 1.5, 2, 2.5, 3]);
 }
