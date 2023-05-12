@@ -14,6 +14,7 @@ ranges-test-*
 *.obj
 *.lst
 streams-test-library
+libstreams.a
 .DS_Store
 
 adrdox/

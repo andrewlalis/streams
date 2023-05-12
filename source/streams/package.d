@@ -17,6 +17,10 @@
  */
 module streams;
 
+/**
+ * Defines compile-time functions that are used to check if an arbitrary type
+ * behaves as a stream in some capacity.
+ */
 public import streams.primitives;
 public import streams.functions;
 public import streams.types;

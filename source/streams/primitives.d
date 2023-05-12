@@ -1,14 +1,60 @@
+/**
+ * A collection of compile-time functions to help in identifying stream types
+ * and related flavors of them.
+ *
+ * Streams come in two main flavors: ${B input} and ${B output} streams.
+ * 
+ * ${B Input streams} are defined by the presence of a `read` function with the
+ * following signature:
+ * ```d
+ * int read(ref DataType[] buffer, uint offset, uint length)
+ * ```
+ *
+ * Such a function should read up to `length` elements of type `DataType`
+ * from an underlying resource and write them to `buffer`, starting from
+ * `offset`.
+ *
+ * ${B Output streams} are defined by the presence of a `write` function with
+ * the following signature:
+ * ```d
+ * int read(ref DataType[] buffer, uint offset, uint length)
+ * ```
+ *
+ * Such a function should read up to `length` elements of type `DataType` from
+ * `buffer` starting from `offset`, and write them to an underlying resource.
+ *
+ * Usually these functions can be used as [Template Constraints](https://dlang.org/spec/template.html#template_constraints)
+ * when defining your own functions and symbols to work with streams.
+ * ```d
+ * void useBytes(S)(S stream) if (isInputStream!(S, ubyte)) {
+ *     ubyte[] buffer = new ubyte[8192];
+ *     int bytesRead = stream.read(buffer, 0, 8192);
+ *     // Do something with the data.
+ * }
+ * ```
+ */
 module streams.primitives;
 
 import std.traits;
 
 /** 
- * Determines if the given template argument is some form of input stream, such
- * that it offers a `read` function where `DataType` is any type:
+ * Determines if the given template argument is some form of input stream.
+ * 
+ * An input stream is anything with a `read` method defined like so:
+ *
  * ```d
  * int read(ref DataType[] buffer, uint offset, uint length)
  * ```
- * Returns: True if the given argument is an input stream type, or false otherwise.
+ * 
+ * where the method takes a reference to a buffer, an offset, and a length, and
+ * reads up to `length` items from some resource, storing them in `buffer`
+ * starting at `offset`. It should return the number of items that were read,
+ * or `-1` in case of error.
+ * 
+ * Some input streams may also throw an exception if an error occurs while
+ * reading.
+ *
+ * Returns: `true` if the given argument is an input stream type, or `false` otherwise.
  */
 bool isSomeInputStream(StreamType)() {
     static if (hasMember!(StreamType, "read") && isCallable!(StreamType.read)) {
@@ -34,8 +80,7 @@ bool isSomeInputStream(StreamType)() {
 }
 
 /** 
- * Determines if the given template argument is some form of output stream,
- * such that it offers a `write` function where `DataType` is any type:
+ * Determines if the given template argument is some form of output stream.
  * ```d
  * int write(ref DataType[] buffer, uint offset, uint length)
  * ```
@@ -65,12 +110,9 @@ bool isSomeOutputStream(StreamType)() {
 }
 
 /** 
- * Determines if the given template argument is an input stream type; that is,
- * one with a function like so:
- * ```d
- * int read(ref ubyte[] buffer, uint offset, uint count)
- * ```
- * Returns: True if the given argument is an input stream, or false otherwise.
+ * Determines if the given stream type is an input stream for reading data of
+ * the given type.
+ * Returns: True if the given stream type is an input stream, or false otherwise.
  */
 bool isInputStream(StreamType, DataType)() {
     static if (isSomeInputStream!StreamType) {
@@ -113,13 +155,9 @@ unittest {
 }
 
 /** 
- * Determines if the given template argument is an output stream type; that is,
- * one with a function like so:
- *
- * ```d
- * int write(ref ubyte[] buffer, uint offset, uint count)
- * ```
- * Returns: True if the given argument is an output stream, or false otherwise.
+ * Determines if the given stream type is an output stream for writing data of
+ * the given type.
+ * Returns: True if the given stream type is an output stream, or false otherwise.
  */
 bool isOutputStream(StreamType, DataType)() {
     static if (isSomeOutputStream!StreamType) {
@@ -182,6 +220,11 @@ unittest {
     assert(!isSomeStream!S3);
 }
 
+/** 
+ * Determines if the given stream type is an input or output stream for data of
+ * the given type.
+ * Returns: True if the stream type is an input or output stream for the given data type.
+ */
 bool isSomeStream(StreamType, DataType)() {
     return isInputStream!(StreamType, DataType) || isOutputStream(StreamType, DataType);
 }
