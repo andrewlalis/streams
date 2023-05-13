@@ -67,6 +67,7 @@ void transferTo(InputStreamType, OutputStreamType, DataType)(
 unittest {
     import streams;
     import std.file;
+    import std.stdio;
 
     auto sIn = FileInputStream("LICENSE");
     auto sOut = FileOutputStream("LICENSE-COPY");
@@ -77,4 +78,17 @@ unittest {
     sIn.close();
     sOut.close();
     assert(getSize("LICENSE") == getSize("LICENSE-COPY"));
+
+    // Check that a stream exception is thrown if transfer fails.
+    sIn = FileInputStream("LICENSE");
+    import std.socket;
+    Socket[2] pair = socketPair();
+    auto socketOut = SocketOutputStream(pair[0]);
+    pair[0].close(); // Intentionally close the socket to trigger a write error.
+    try {
+        transferTo!(FileInputStream, SocketOutputStream, ubyte)(sIn, socketOut);
+        assert(false, "No exception was thrown.");
+    } catch (StreamException e) {
+        // This is expected.
+    }
 }

@@ -275,4 +275,34 @@ unittest {
     DataReadResult!ubyte result = dataIn.read!ubyte();
     assert(result.value.isNull);
     assert(result.error.get().lastStreamResult == 0);
+
+    // Test that reading normally still works.
+    auto sIn1 = inputStreamFor!ubyte([1, 2, 3, 4]);
+    auto dataIn1 = dataInputStreamFor(sIn1);
+    ubyte[] buffer1 = new ubyte[3];
+    assert(dataIn1.read(buffer1) == 3);
+    assert(buffer1 == [1, 2, 3]);
+
+    // Test that writing normally still works.
+    auto sOut1 = ArrayOutputStream!ubyte();
+    auto dataOut1 = dataOutputStreamFor(sOut1);
+    dataOut1.write([1, 2, 3]);
+    assert(sOut1.toArray() == [1, 2, 3]);
+
+    // Test that calling readOrThrow throws an exception with invalid data.
+    auto sIn2 = inputStreamFor!ubyte([1, 2, 3]);
+    auto dataIn2 = dataInputStreamFor(sIn2);
+    try {
+        dataIn2.readOrThrow!int();
+        assert(false, "Failed to throw exception.");
+    } catch (StreamException e) {
+        // This is expected.
+    }
+
+    // Test that reading a static array with invalid data returns an error.
+    auto sIn3 = inputStreamFor!ubyte([1, 2, 3]);
+    auto dataIn3 = dataInputStreamFor(sIn3);
+    DataReadResult!(ubyte[4]) result3 = dataIn3.read!(ubyte[4])();
+    assert(result3.value.isNull);
+    assert(result3.error.get().lastStreamResult == 0);
 }

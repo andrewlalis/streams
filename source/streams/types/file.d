@@ -70,9 +70,24 @@ struct FileOutputStream {
 }
 
 unittest {
-    import streams.primitives;
+    import streams;
+    import std.file;
 
     assert(isOutputStream!(FileOutputStream, ubyte));
     assert(isClosableStream!FileOutputStream);
     assert(isFlushableStream!FileOutputStream);
+
+    // Test flushing of file.
+    const FILENAME = "test-file-flush";
+    File f1 = File(FILENAME, "wb");
+    scope(exit) {
+        std.file.remove(FILENAME);
+    }
+    auto sOut = FileOutputStream(f1);
+    sOut.flush();
+    assert(getSize(FILENAME) == 0);
+    auto dOut = dataOutputStreamFor(sOut);
+    dOut.write!(char[5])("Hello");
+    sOut.flush();
+    assert(readText(FILENAME) == "Hello");
 }

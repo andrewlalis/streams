@@ -39,6 +39,10 @@ unittest {
     assert(buffer == [3, 4]);
     assert(s1.read(buffer) == 1);
     assert(buffer == [5, 4]);
+
+    s1.reset();
+    assert(s1.read(buffer) == 2);
+    assert(buffer == [1, 2]);
 }
 
 /** 
@@ -96,4 +100,9 @@ unittest {
     s2.write(buffer1);
     ubyte[] data = s2.toArray();
     assert(data == [1, 2, 3]);
+
+    s2.reset();
+    assert(s2.toArray().length == 0);
+    s2.write(buffer1);
+    assert(s2.toArray() == [1, 2, 3]);
 }

@@ -28,3 +28,6 @@ jobs:
       
       - name: Run Tests
         run: dub -q test
+
+      - name: Coverage
+        run: ./gen_coverage.d

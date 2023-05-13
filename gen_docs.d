@@ -1,4 +1,8 @@
 #!/usr/bin/env rdmd
+/**
+ * Run this script to generate documentation for this project in the
+ * generated-docs/ directory, using the Adrdox doc generator.
+ */
 module gen_docs;
 
 import std.process;
