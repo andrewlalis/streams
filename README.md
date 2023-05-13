@@ -46,11 +46,20 @@ safe, no-gc compatible, pure, and so on.
 
 ## Difference with Ranges
 
-Phobos' concept of an **InputRange** relies on implicit buffering of results,
+Phobos' concept of an **Input Range** relies on implicit buffering of results,
 because of the contract it defines with `front()` needing to return the same
 result in consecutive calls without calling `popFront()`. This doesn't map as
 easily to many low-level resources, and also introduces additional cognitive
 complexity to programmers who don't need that functionality.
+
+This isn't to say that ranges aren't useful! They certainly are in many cases,
+but the argument is that a simpler stream interface is more useful in IO-heavy
+tasks or other cases where you simply want to read or write data to/from a
+buffer.
+
+Furthermore, streams of this nature are a common feature in many other
+programming languages, and thus provides a bit of a "comfort zone" to help
+welcome programmers.
 
 For compatibility, this library provides the functions `asInputRange` and
 `asOutputRange` to wrap an input stream as a Phobos input range and an output
@@ -65,3 +74,8 @@ any compiler, and run `dub test` to test the library.
 
 Documentation can be generated with `./gen_docs.d`, which internally uses
 Adrdox to generate documentation at `generated-docs/`.
+
+This codebase is expected to maintain a high code-quality, and while no
+automated checks are in-place, it is expected that pull requests that add
+significant new code adhere to the conventions already in use, and document
+any new symbols you added.

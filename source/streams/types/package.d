@@ -1,3 +1,7 @@
+/**
+ * Container module with sub-modules that define stream implementations for
+ * various use cases.
+ */
 module streams.types;
 
 public import streams.types.array;

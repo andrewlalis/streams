@@ -9,84 +9,151 @@ module streams.types.data;
 
 import streams.primitives;
 import std.traits;
+import std.typecons;
 
-struct DataInputStream(BaseStream) if (isByteInputStream!BaseStream) {
-    private BaseStream* stream;
+/** 
+ * Information about an error that occurred while reading or writing in a
+ * data stream.
+ */
+struct DataStreamError {
+    /** 
+     * A description of the error that occurred.
+     */
+    const(char[]) message;
+    /** 
+     * The return value from the stream operation that caused the error.
+     */
+    const int lastStreamResult;
+}
 
-    this(ref BaseStream stream) {
+/** 
+ * The result of a data input stream read operation, which is either a value
+ * or an error.
+ */
+struct DataReadResult(T) {
+    /** 
+     * The value that was read. Is null only if there's an error.
+     */
+    const Nullable!T value;
+
+    /** 
+     * The error that occurred. Is only present if an error actually occurred.
+     */
+    const Nullable!DataStreamError error;
+
+    /** 
+     * Constructs a result containing a value that was successfully read.
+     * Params:
+     *   value = The value that was read.
+     */
+    this(T value) {
+        this.value = Nullable!T(value);
+        this.error = Nullable!DataStreamError.init;
+    }
+
+    /** 
+     * Constructs a result containing an error that occurred while reading.
+     * Params:
+     *   error = The error that occurred.
+     */
+    this(DataStreamError error) {
+        this.error = Nullable!DataStreamError(error);
+        this.value = Nullable!T.init;
+    }
+
+    // Ensure an XOR relationship between value and error.
+    // Either we have a value, or we have an error.
+    invariant {
+        assert((value.isNull || error.isNull) && !(value.isNull && error.isNull));
+    }
+}
+
+/** 
+ * An output stream that is wrapped around a byte output stream, so that values
+ * may be written to the stream as bytes.
+ */
+struct DataInputStream(S) if (isByteInputStream!S) {
+    private S* stream;
+
+    /** 
+     * Constructs a data input stream that reads from a given underlying byte
+     * input stream.
+     * Params:
+     *   stream = The stream to read from.
+     */
+    this(ref S stream) {
         this.stream = &stream;
     }
 
+    /** 
+     * Delegates reading to the underlying stream.
+     * Params:
+     *   buffer = The buffer to read to.
+     * Returns: The number of bytes read.
+     */
     int read(ubyte[] buffer) {
         return this.stream.read(buffer);
     }
 
-    DataType read(DataType)() {
-        static if (isSomeString!DataType) {
-            return cast(DataType) readArray!(char[])();
-        } else static if (isStaticArray!DataType) {
-            return readStaticArray!DataType();
-        } else static if (isArray!DataType) {
-            return readArray!DataType();
+    /** 
+     * Reads a value from the stream.
+     * Returns: A result containing either that value that was read, or an error.
+     */
+    DataReadResult!T read(T)() {
+        static if (isStaticArray!T) {
+            return readStaticArray!T();
+        } else static if (isScalarType!T) {
+            return readScalar!T();
         } else {
-            return readPrimitive!DataType();
+            static assert(
+                false,
+                "Cannot read values of type " ~ T.stringof ~ ". " ~
+                "Only scalar types and static arrays are supported."
+            );
         }
     }
 
-    private T readPrimitive(T)() {
+    version (D_BetterC) {} else {
+        /** 
+         * Reads a value from the stream and throws a StreamException if reading
+         * failed for any reason.
+         * Returns: The value that was read.
+         */
+        T readOrThrow(T)() {
+            DataReadResult!T result = this.read!T();
+            if (!result.error.isNull) {
+                throw new StreamException(cast(string) result.error.get().message);
+            }
+            return result.value.get();
+        }
+    }
+
+    private DataReadResult!T readScalar(T)() {
         union U { T value; ubyte[T.sizeof] bytes; }
         U u;
         int bytesRead = this.stream.read(u.bytes[]);
         if (bytesRead != T.sizeof) {
-            import std.format;
-            throw new StreamException(format!
-                "Failed to read value of type %s (%d bytes) from range. Read %d bytes instead."
-                (T.stringof, T.sizeof, bytesRead)
-            );
+            return DataReadResult!T(DataStreamError(
+                "Failed to read scalar value of type \"" ~ T.stringof ~ "\"" ~
+                " from stream of type \"" ~ S.stringof ~ "\".",
+                bytesRead
+            ));
         }
-        return u.value;
+        return DataReadResult!T(u.value);
     }
 
-    private T readArray(T)() if (isArray!T) {
-        uint size;
-        try {
-            size = readPrimitive!uint();
-        } catch (StreamException e) {
-            throw new StreamException("Failed to read array size uint.", e);
-        }
-        alias ElementType = typeof(*T.init.ptr);
-        T tempData = new ElementType[size];
-        for (uint i = 0; i < size; i++) {
-            try {
-                tempData[i] = readPrimitive!ElementType();
-            } catch (StreamException e) {
-                import std.format;
-                throw new StreamException(format!
-                    "Failed to read array element %d of %d, of type %s."
-                    (i + 1, size, ElementType.stringof),
-                    e
-                );
-            }
-        }
-        return tempData;
-    }
-
-    private T readStaticArray(T)() if (isStaticArray!T) {
+    private DataReadResult!T readStaticArray(T)() {
+        static if (T.length == 0) return DataReadResult!T(T[0]);
         alias ElementType = typeof(*T.init.ptr);
         T data;
         for (uint i = 0; i < T.length; i++) {
-            try {
-                data[i] = readPrimitive!ElementType();
-            } catch (StreamException e) {
-                import std.format;
-                throw new StreamException(format!
-                    "Failed to read static array element %d of %d, of type %s."
-                    (i + 1, T.length, ElementType.stringof),
-                    e
-                );
+            DataReadResult!ElementType elementResult = read!ElementType();
+            if (!elementResult.error.isNull) {
+                return DataReadResult!T(elementResult.error.get());
             }
+            data[i] = elementResult.value.get();
         }
-        return data;
+        return DataReadResult!T(data);
     }
 }
 
@@ -103,81 +170,78 @@ DataInputStream!S dataInputStreamFor(S)(
     return DataInputStream!S(stream);
 }
 
-struct DataOutputStream(BaseStream) if (isByteOutputStream!BaseStream) {
-    private BaseStream* stream;
+/** 
+ * An input stream that is wrapped around a byte input stream, so that values
+ * may be read from the stream as bytes.
+ */
+struct DataOutputStream(S) if (isByteOutputStream!S) {
+    private S* stream;
 
-    this(ref BaseStream stream) {
+    /** 
+     * Constructs the data output stream so it will write to the given stream.
+     * Params:
+     *   stream = The stream to write to.
+     */
+    this(ref S stream) {
         this.stream = &stream;
     }
 
+    /** 
+     * Delegates writing to the underlying stream.
+     * Params:
+     *   buffer = The buffer whose contents to write.
+     * Returns: The number of bytes written.
+     */
     int write(ubyte[] buffer) {
         return this.stream.write(buffer);
     }
 
-    void write(T)(T value) {
-        static if (isSomeString!T) {
-            writeArray!(char[])(cast(char[]) value);
-        } else static if (isStaticArray!T) {
-            writeStaticArray!T(value);
-        } else static if (isArray!T) {
-            writeArray!T(value);
+    /** 
+     * Writes a value of type `T` to the stream. If writing fails for
+     * whatever reason, a StreamException is thrown.
+     * Params:
+     *   value = The value to write.
+     * Returns: A nullable error, which is set if an error occurs.
+     */
+    Nullable!DataStreamError write(T)(T value) {
+        static if (isStaticArray!T) {
+            return writeStaticArray!T(value);
+        } else static if (isScalarType!T) {
+            return writeScalar!T(value);
         } else {
-            writePrimitive!T(value);
+            static assert(
+                false,
+                "Cannot read values of type " ~ T.stringof ~ ". " ~
+                "Only scalar types and static arrays are supported."
+            );
         }
     }
 
-    private void writePrimitive(T)(T value) {
+    private Nullable!DataStreamError writeScalar(T)(T value) {
         union U { T value; ubyte[T.sizeof] bytes; }
         U u;
         u.value = value;
         int bytesWritten = this.stream.write(u.bytes[]);
         if (bytesWritten != T.sizeof) {
-            import std.format;
-            throw new StreamException(format!
-                "Failed to write value of type %s (%d bytes, value = %s) to range. Wrote %d bytes instead."
-                (T.stringof, T.sizeof, value, bytesWritten)
-            );
+            return Nullable!DataStreamError(DataStreamError(
+                "Failed to write scalar value of type \"" ~ T.stringof ~ "\"" ~
+                " to stream of type \"" ~ S.stringof ~ "\".",
+                bytesWritten
+            ));
         }
+        return Nullable!DataStreamError.init;
     }
 
-    private void writeArray(T)(T value) if (isArray!T) {
-        try {
-            writePrimitive!uint(cast(uint) value.length);
-        } catch (StreamException e) {
-            import std.format;
-            throw new StreamException("Failed to write array size uint.");
-        }
-        if (value.length == 0) return;
-        alias ElementType = typeof(value[0]);
-        for (uint i = 0; i < value.length; i++) {
-            try {
-                writePrimitive!ElementType(value[i]);
-            } catch (StreamException e) {
-                import std.format;
-                throw new StreamException(format!
-                    "Failed to write array element %d of %d, of type %s."
-                    (i + 1, value.length, ElementType.stringof),
-                    e
-                );
-            }
-        }
-    }
-
-    private void writeStaticArray(T)(T value) if (isStaticArray!T) {
+    private Nullable!DataStreamError writeStaticArray(T)(T value) if (isStaticArray!T) {
         static if (T.length == 0) return;
         alias ElementType = typeof(*T.init.ptr);
         for (uint i = 0; i < T.length; i++) {
-            try {
-                writePrimitive!ElementType(value[i]);
-            } catch (StreamException e) {
-                import std.format;
-                throw new StreamException(format!
-                    "Failed to write static array element %d of %d, of type %s."
-                    (i + 1, T.length, ElementType.stringof),
-                    e
-                );
+            Nullable!DataStreamError error = write!ElementType(value[i]);
+            if (!error.isNull) {
+                return error;
             }
         }
+        return Nullable!DataStreamError.init;
     }
 }
 
@@ -201,11 +265,14 @@ unittest {
     auto dataOut = dataOutputStreamFor(sOut);
     dataOut.write(42);
     dataOut.write(true);
-    dataOut.write("Hello");
+    dataOut.write(cast(char[5]) "Hello");
     ubyte[] data = sOut.toArray();
     auto sIn = inputStreamFor(data);
     auto dataIn = dataInputStreamFor(sIn);
-    assert(dataIn.read!int == 42);
-    assert(dataIn.read!bool == true);
-    assert(dataIn.read!string == "Hello");
+    assert(dataIn.readOrThrow!int == 42);
+    assert(dataIn.readOrThrow!bool == true);
+    assert(dataIn.readOrThrow!(char[5]) == "Hello");
+    DataReadResult!ubyte result = dataIn.read!ubyte();
+    assert(result.value.isNull);
+    assert(result.error.get().lastStreamResult == 0);
 }

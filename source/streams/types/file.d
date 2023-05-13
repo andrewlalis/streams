@@ -1,7 +1,14 @@
+/** 
+ * Defines input and output streams for reading and writing files, using
+ * `std.stdio.File` as the underlying resource.
+ */
 module streams.types.file;
 
-import std.stdio;
+import std.stdio : File;
 
+/** 
+ * A byte input stream that reads from a file.
+ */
 struct FileInputStream {
     private File file;
 
@@ -32,6 +39,9 @@ unittest {
     assert(isClosableStream!FileInputStream);
 }
 
+/** 
+ * A byte output stream that writes to a file.
+ */
 struct FileOutputStream {
     private File file;
 
