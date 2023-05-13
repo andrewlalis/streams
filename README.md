@@ -7,35 +7,15 @@ some element type `T`.
 
 Similar to [Phobos' ranges](https://dlang.org/phobos/std_range.html), streams
 are defined and type-checked using a _primitives_ package that contains various
-compile-time functions like `isInputRange` and `isOutputRange`. Take the
-following example, where we define a simple input stream implementation for
-reading from a file, and use it in a function that accepts any byte input
-stream to collect the results in an array:
+compile-time functions like `isInputRange` and `isOutputRange`. Let's look at an example where we write some data to a socket using streams:
 
 ```d
-struct FileInputStream {
-    File f;
+import streams;
 
-    int read(ubyte[] buffer) {
-        ubyte[] slice = this.file.rawRead(buffer);
-        return cast(int) slice.length;
-    }
-}
-
-ubyte[] readToArray(S)(S stream) if (isInputStream!(S, ubyte)) {
-    import std.array;
-    ubyte[] buffer = new ubyte[8192];
-    auto app = appender!(ubyte[]);
-    int bytes;
-    while ((bytes = stream.read(buffer)) > 0) {
-        app ~= buffer[0 .. bytes];
-    }
-    return buffer;
-}
-
-unittest {
-    import streams;
-    assert(isInputStream!(FileInputStream, ubyte));
+void sayHello(Socket socket) {
+    auto outputStream = SocketOutputStream(socket);
+    auto dataOutput = dataOutputStreamFor(outputStream);
+    dataOutput.write!(char[5])("Hello");
 }
 ```
 
