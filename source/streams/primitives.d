@@ -29,6 +29,7 @@
 module streams.primitives;
 
 import std.traits;
+import std.range;
 
 /** 
  * Determines if the given template argument is some form of input stream,
@@ -212,6 +213,33 @@ unittest {
         }
     }
     assert(!isOutputStream!(S4, ubyte));
+}
+
+/** 
+ * Wraps an existing output stream as a Phobos-style output range with a
+ * `put` method, to make any output stream compatible with functions that take
+ * output ranges. The given stream is stored as a pointer in the underlying
+ * range implementation, so you should still manage ownership of the original
+ * stream.
+ * Params:
+ *   stream = The stream to wrap.
+ */
+auto asOutputRange(E, S)(ref S stream) if (isOutputStream!(S, E)) {
+    struct StreamOutputRange {
+        private S* stream;
+        
+        void put(E[] buffer) {
+            this.stream.write(buffer);
+        }
+    }
+    return StreamOutputRange(&stream);
+}
+
+unittest {
+    import streams;
+    auto s = ArrayOutputStream!ubyte();
+    auto o = asOutputRange!ubyte(s);
+    assert(isOutputRange!(typeof(o), ubyte));
 }
 
 /** 
