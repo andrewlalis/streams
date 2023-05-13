@@ -5,9 +5,8 @@ import std.socket;
 struct SocketInputStream {
     private Socket socket;
 
-    int read(ref ubyte[] buffer, uint offset, uint length) {
-        ubyte[] slice = buffer[offset .. offset + length];
-        ptrdiff_t receiveCount = this.socket.receive(slice);
+    int read(ubyte[] buffer) {
+        ptrdiff_t receiveCount = this.socket.receive(buffer);
         return cast(int) receiveCount;
     }
 
@@ -27,8 +26,8 @@ unittest {
 struct SocketOutputStream {
     private Socket socket;
 
-    int write(ref ubyte[] buffer, uint offset, uint length) {
-        ptrdiff_t sendCount = this.socket.send(buffer[offset .. offset + length]);
+    int write(ubyte[] buffer) {
+        ptrdiff_t sendCount = this.socket.send(buffer);
         return cast(int) sendCount;
     }
 

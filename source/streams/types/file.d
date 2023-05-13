@@ -13,8 +13,8 @@ struct FileInputStream {
         this(File(filename, "rb"));
     }
 
-    int read(ref ubyte[] buffer, uint offset, uint length) {
-        ubyte[] slice = this.file.rawRead(buffer[offset .. offset + length]);
+    int read(ubyte[] buffer) {
+        ubyte[] slice = this.file.rawRead(buffer);
         return cast(int) slice.length;
     }
 
@@ -43,9 +43,9 @@ struct FileOutputStream {
         this(File(filename, "wb"));
     }
 
-    int write(ref ubyte[] buffer, uint offset, uint length) {
-        this.file.rawWrite(buffer[offset .. offset + length]);
-        return length;
+    int write(ubyte[] buffer) {
+        this.file.rawWrite(buffer);
+        return cast(int) buffer.length;
     }
 
     void flush() {

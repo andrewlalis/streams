@@ -1,6 +1,9 @@
 /**
  * Defines streams for reading and writing primitive data and arrays of
- * primitive values.
+ * primitive values. So-called "data" input and output streams are defined as
+ * decorators around an existing "base" stream, so when you read or write on
+ * a data stream, it's just performing an analogous operation on its base
+ * stream.
  */
 module streams.types.data;
 
@@ -10,8 +13,12 @@ import std.traits;
 struct DataInputStream(BaseStream) if (isByteInputStream!BaseStream) {
     private BaseStream* stream;
 
-    int read(ref ubyte[] buffer, uint offset, uint length) {
-        return this.stream.read(buffer, offset, length);
+    this(ref BaseStream stream) {
+        this.stream = &stream;
+    }
+
+    int read(ubyte[] buffer) {
+        return this.stream.read(buffer);
     }
 
     DataType read(DataType)() {
@@ -27,16 +34,14 @@ struct DataInputStream(BaseStream) if (isByteInputStream!BaseStream) {
     }
 
     private T readPrimitive(T)() {
-        const byteSize = T.sizeof;
-        union U { T value; ubyte[byteSize] bytes; }
+        union U { T value; ubyte[T.sizeof] bytes; }
         U u;
-        ubyte[] buffer = u.bytes[];
-        int bytesRead = this.stream.read(buffer, 0, byteSize);
-        if (bytesRead != byteSize) {
+        int bytesRead = this.stream.read(u.bytes[]);
+        if (bytesRead != T.sizeof) {
             import std.format;
             throw new StreamException(format!
                 "Failed to read value of type %s (%d bytes) from range. Read %d bytes instead."
-                (T.stringof, byteSize, bytesRead)
+                (T.stringof, T.sizeof, bytesRead)
             );
         }
         return u.value;
@@ -85,11 +90,28 @@ struct DataInputStream(BaseStream) if (isByteInputStream!BaseStream) {
     }
 }
 
+/** 
+ * Creates and returns a data input stream that's wrapped around the given
+ * byte input stream.
+ * Params:
+ *   stream = The stream to wrap in a data input stream.
+ * Returns: The data input stream.
+ */
+DataInputStream!S dataInputStreamFor(S)(
+    ref S stream
+) if (isByteInputStream!S) {
+    return DataInputStream!S(stream);
+}
+
 struct DataOutputStream(BaseStream) if (isByteOutputStream!BaseStream) {
     private BaseStream* stream;
 
-    int write(ref ubyte[] buffer, uint offset, uint length) {
-        return this.stream.write(buffer, offset, length);
+    this(ref BaseStream stream) {
+        this.stream = &stream;
+    }
+
+    int write(ubyte[] buffer) {
+        return this.stream.write(buffer);
     }
 
     void write(T)(T value) {
@@ -105,17 +127,15 @@ struct DataOutputStream(BaseStream) if (isByteOutputStream!BaseStream) {
     }
 
     private void writePrimitive(T)(T value) {
-        const uint byteSize = T.sizeof;
-        union U { T value; ubyte[byteSize] bytes; }
+        union U { T value; ubyte[T.sizeof] bytes; }
         U u;
         u.value = value;
-        ubyte[] buffer = u.bytes[];
-        int bytesWritten = this.stream.write(buffer, 0, byteSize);
-        if (bytesWritten != byteSize) {
+        int bytesWritten = this.stream.write(u.bytes[]);
+        if (bytesWritten != T.sizeof) {
             import std.format;
             throw new StreamException(format!
                 "Failed to write value of type %s (%d bytes, value = %s) to range. Wrote %d bytes instead."
-                (T.stringof, byteSize, value, bytesWritten)
+                (T.stringof, T.sizeof, value, bytesWritten)
             );
         }
     }
@@ -161,9 +181,21 @@ struct DataOutputStream(BaseStream) if (isByteOutputStream!BaseStream) {
     }
 }
 
+/** 
+ * Creates and returns a data output stream that's wrapped around the given
+ * byte output stream.
+ * Params:
+ *   stream = The stream to wrap in a data output stream.
+ * Returns: The data output stream.
+ */
+DataOutputStream!S dataOutputStreamFor(S)(
+    ref S stream
+) if (isByteOutputStream!S) {
+    return DataOutputStream!S(stream);
+}
+
 unittest {
     import streams.types.array;
-    import streams.factory;
 
     auto sOut = ArrayOutputStream!ubyte();
     auto dataOut = dataOutputStreamFor(sOut);
