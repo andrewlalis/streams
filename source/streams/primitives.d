@@ -177,6 +177,66 @@ unittest {
 }
 
 /** 
+ * Wraps an existing input stream as a Phobos-style input range, to make any
+ * input stream compatible with functions that take input ranges. The given
+ * stream is stored as a pointer in the underlying range implementation, so you
+ * should still manage ownership of the original stream.
+ * 
+ * ```d
+ * import std.range.primitives : isInputRange;
+ * import streams;
+ *
+ * auto stream = inputStreamFor!int([1, 2, 3]);
+ * auto range = asInputRange!int(stream);
+ * assert(isInputRange!(typeof(range)));
+ * ```
+ * Params:
+ *   stream = The stream to wrap.
+ * Returns: The input range.
+ */
+auto asInputRange(E, S)(ref S stream) if (isInputStream!(S, E)) {
+    struct InputStreamRange {
+        import std.typecons;
+
+        private S* stream;
+        private Nullable!E lastElement;
+        private int lastRead;
+
+        this(ref S stream) {
+            this.stream = &stream;
+            // Initialize the range with one element.
+            this.popFront();
+        }
+
+        void popFront() {
+            E[1] buffer;
+            this.lastRead = this.stream.read(buffer);
+            if (this.lastRead > 0) {
+                this.lastElement = nullable(buffer[0]);
+            } else {
+                this.lastElement = Nullable!E.init;
+            }
+        }
+
+        bool empty() {
+            return this.lastRead < 1;
+        }
+
+        E front() {
+            return this.lastElement.get();
+        }
+    }
+    return InputStreamRange(stream);
+}
+
+unittest {
+    import streams;
+    auto s = inputStreamFor!ubyte([1, 2, 3]);
+    auto r = asInputRange!ubyte(s);
+    assert(isInputRange!(typeof(r)));
+}
+
+/** 
  * Determines if the given stream type is an output stream for writing data of
  * the given type.
  * Returns: `true` if the given stream type is an output stream.
@@ -221,8 +281,18 @@ unittest {
  * output ranges. The given stream is stored as a pointer in the underlying
  * range implementation, so you should still manage ownership of the original
  * stream.
+ * 
+ * ```d
+ * import std.range.primitives : isOutputRange;
+ * import streams;
+ *
+ * auto stream = ArrayOutputStream!int();
+ * auto range = asOutputRange!int(stream);
+ * assert(isOutputRange!(typeof(range), int));
+ * ```
  * Params:
  *   stream = The stream to wrap.
+ * Returns: The output range.
  */
 auto asOutputRange(E, S)(ref S stream) if (isOutputStream!(S, E)) {
     struct StreamOutputRange {

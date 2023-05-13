@@ -39,6 +39,11 @@ unittest {
 }
 ```
 
+Stream primitives are generally compatible with [BetterC](https://dlang.org/spec/betterc.html),
+although there may be incompatibilities in various implementations where
+dynamic arrays or exceptions are used. You may certainly write streams that are
+safe, no-gc compatible, pure, and so on.
+
 ## Difference with Ranges
 
 Phobos' concept of an **InputRange** relies on implicit buffering of results,
@@ -46,3 +51,17 @@ because of the contract it defines with `front()` needing to return the same
 result in consecutive calls without calling `popFront()`. This doesn't map as
 easily to many low-level resources, and also introduces additional cognitive
 complexity to programmers who don't need that functionality.
+
+For compatibility, this library provides the functions `asInputRange` and
+`asOutputRange` to wrap an input stream as a Phobos input range and an output
+stream as a Phobos output range, respectively. Note that due to the inherently
+un-buffered nature of streams, these range implementations may not be as
+performant as existing range implementations for certain resources.
+
+## Development
+
+Simply clone this repository, and ensure you have a recent version of D with
+any compiler, and run `dub test` to test the library.
+
+Documentation can be generated with `./gen_docs.d`, which internally uses
+Adrdox to generate documentation at `generated-docs/`.
