@@ -231,7 +231,7 @@ auto asInputRange(E, S)(ref S stream) if (isInputStream!(S, E)) {
 
 unittest {
     import streams;
-    auto s = inputStreamFor!ubyte([1, 2, 3]);
+    auto s = arrayInputStreamFor!ubyte([1, 2, 3]);
     auto r = asInputRange!ubyte(s);
     assert(isInputRange!(typeof(r)));
     assert(!r.empty());
@@ -363,7 +363,7 @@ auto asOutputRange(E, S)(ref S stream) if (isOutputStream!(S, E)) {
 
 unittest {
     import streams;
-    auto s = ArrayOutputStream!ubyte();
+    auto s = arrayOutputStreamFor!ubyte;
     auto o = asOutputRange!ubyte(s);
     assert(isOutputRange!(typeof(o), ubyte));
     assert(s.toArray() == []);

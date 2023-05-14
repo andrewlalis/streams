@@ -261,13 +261,13 @@ DataOutputStream!S dataOutputStreamFor(S)(
 unittest {
     import streams.types.array;
 
-    auto sOut = ArrayOutputStream!ubyte();
+    auto sOut = arrayOutputStreamFor!ubyte;
     auto dataOut = dataOutputStreamFor(sOut);
     dataOut.write(42);
     dataOut.write(true);
     dataOut.write(cast(char[5]) "Hello");
     ubyte[] data = sOut.toArray();
-    auto sIn = inputStreamFor(data);
+    auto sIn = arrayInputStreamFor(data);
     auto dataIn = dataInputStreamFor(sIn);
     assert(dataIn.readOrThrow!int == 42);
     assert(dataIn.readOrThrow!bool == true);
@@ -277,20 +277,20 @@ unittest {
     assert(result.error.get().lastStreamResult == 0);
 
     // Test that reading normally still works.
-    auto sIn1 = inputStreamFor!ubyte([1, 2, 3, 4]);
+    auto sIn1 = arrayInputStreamFor!ubyte([1, 2, 3, 4]);
     auto dataIn1 = dataInputStreamFor(sIn1);
     ubyte[] buffer1 = new ubyte[3];
     assert(dataIn1.read(buffer1) == 3);
     assert(buffer1 == [1, 2, 3]);
 
     // Test that writing normally still works.
-    auto sOut1 = ArrayOutputStream!ubyte();
+    auto sOut1 = arrayOutputStreamFor!ubyte;
     auto dataOut1 = dataOutputStreamFor(sOut1);
     dataOut1.write([1, 2, 3]);
     assert(sOut1.toArray() == [1, 2, 3]);
 
     // Test that calling readOrThrow throws an exception with invalid data.
-    auto sIn2 = inputStreamFor!ubyte([1, 2, 3]);
+    auto sIn2 = arrayInputStreamFor!ubyte([1, 2, 3]);
     auto dataIn2 = dataInputStreamFor(sIn2);
     try {
         dataIn2.readOrThrow!int();
@@ -300,7 +300,7 @@ unittest {
     }
 
     // Test that reading a static array with invalid data returns an error.
-    auto sIn3 = inputStreamFor!ubyte([1, 2, 3]);
+    auto sIn3 = arrayInputStreamFor!ubyte([1, 2, 3]);
     auto dataIn3 = dataInputStreamFor(sIn3);
     DataReadResult!(ubyte[4]) result3 = dataIn3.read!(ubyte[4])();
     assert(result3.value.isNull);
