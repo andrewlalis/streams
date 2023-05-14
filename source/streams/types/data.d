@@ -69,20 +69,60 @@ struct DataReadResult(T) {
 }
 
 /** 
+ * An enum defining the endianness of a stream, which is how it assumes data on
+ * the underlying resource to be written and read, irrespective of the system
+ * endianness.
+ */
+enum Endianness { BigEndian, LittleEndian }
+
+version (BigEndian) {
+    immutable Endianness SYSTEM_ENDIANNESS = Endianness.BigEndian;
+} else {
+    immutable Endianness SYSTEM_ENDIANNESS = Endianness.LittleEndian;
+}
+
+/** 
+ * A helper function that flips a static array's elements if needed so that its
+ * byte order matches a target byte order.
+ * Params:
+ *   bytes = The bytes to possibly flip.
+ *   sourceOrder = The byte order of the source that produced the bytes.
+ *   targetOrder = The byte order of the consumer of the bytes.
+ */
+private void ensureByteOrder(T)(
+    ref ubyte[T.sizeof] bytes,
+    Endianness sourceOrder,
+    Endianness targetOrder
+) if (isScalarType!T) {
+    if (sourceOrder != targetOrder) {
+        ubyte tmp;
+        static foreach (i; 0 .. T.sizeof / 2) {
+            tmp = bytes[i];
+            bytes[i] = bytes[T.sizeof - 1 - i];
+            bytes[T.sizeof - 1 - i] = tmp;
+        }
+    }
+}
+
+/** 
  * An output stream that is wrapped around a byte output stream, so that values
  * may be written to the stream as bytes.
  */
 struct DataInputStream(S) if (isByteInputStream!S) {
     private S* stream;
+    private immutable Endianness endianness;
 
     /** 
      * Constructs a data input stream that reads from a given underlying byte
      * input stream.
      * Params:
      *   stream = The stream to read from.
+     *   endianness = The byte order of the resource that this stream is
+     *                reading from. Defaults to the system byte order.
      */
-    this(ref S stream) {
+    this(ref S stream, Endianness endianness = SYSTEM_ENDIANNESS) {
         this.stream = &stream;
+        this.endianness = endianness;
     }
 
     /** 
@@ -139,6 +179,7 @@ struct DataInputStream(S) if (isByteInputStream!S) {
                 bytesRead
             ));
         }
+        ensureByteOrder!T(u.bytes, SYSTEM_ENDIANNESS, this.endianness);
         return DataReadResult!T(u.value);
     }
 
@@ -162,12 +203,15 @@ struct DataInputStream(S) if (isByteInputStream!S) {
  * byte input stream.
  * Params:
  *   stream = The stream to wrap in a data input stream.
+ *   endianness = The byte order of the resource that this stream is
+ *                reading from. Defaults to the system byte order.
  * Returns: The data input stream.
  */
 DataInputStream!S dataInputStreamFor(S)(
-    ref S stream
+    ref S stream,
+    Endianness endianness = SYSTEM_ENDIANNESS
 ) if (isByteInputStream!S) {
-    return DataInputStream!S(stream);
+    return DataInputStream!S(stream, endianness);
 }
 
 /** 
@@ -176,14 +220,18 @@ DataInputStream!S dataInputStreamFor(S)(
  */
 struct DataOutputStream(S) if (isByteOutputStream!S) {
     private S* stream;
+    private immutable Endianness endianness;
 
     /** 
      * Constructs the data output stream so it will write to the given stream.
      * Params:
      *   stream = The stream to write to.
+     *   endianness = The byte order of the resource we're writing to. Defaults
+     *                to the system byte order.
      */
-    this(ref S stream) {
+    this(ref S stream, Endianness endianness = SYSTEM_ENDIANNESS) {
         this.stream = &stream;
+        this.endianness = endianness;
     }
 
     /** 
@@ -221,6 +269,7 @@ struct DataOutputStream(S) if (isByteOutputStream!S) {
         union U { T value; ubyte[T.sizeof] bytes; }
         U u;
         u.value = value;
+        ensureByteOrder!T(u.bytes, this.endianness, SYSTEM_ENDIANNESS);
         int bytesWritten = this.stream.write(u.bytes[]);
         if (bytesWritten != T.sizeof) {
             return Nullable!DataStreamError(DataStreamError(
@@ -250,12 +299,15 @@ struct DataOutputStream(S) if (isByteOutputStream!S) {
  * byte output stream.
  * Params:
  *   stream = The stream to wrap in a data output stream.
+ *   endianness = The byte order of the resource we're writing to. Defaults
+ *                to the system byte order.
  * Returns: The data output stream.
  */
 DataOutputStream!S dataOutputStreamFor(S)(
-    ref S stream
+    ref S stream,
+    Endianness endianness = SYSTEM_ENDIANNESS
 ) if (isByteOutputStream!S) {
-    return DataOutputStream!S(stream);
+    return DataOutputStream!S(stream, endianness);
 }
 
 unittest {
@@ -317,4 +369,15 @@ unittest {
     auto dataOut5 = dataOutputStreamFor(sOut5);
     Nullable!DataStreamError error5 = dataOut5.write!(int[3])([3, 2, 1]);
     assert(!error5.isNull);
+
+    // Test that writing to an array with opposite byte order works as expected.
+    auto sOut6 = byteArrayOutputStream();
+    auto dataOut6 = dataOutputStreamFor(sOut6, Endianness.BigEndian);
+    dataOut6.write!short(1);
+    assert(sOut6.toArrayRaw() == [0, 1]);
+    sOut6.reset();
+    auto dataOut7 = dataOutputStreamFor(sOut6, Endianness.LittleEndian);
+    dataOut7.write!short(1);
+    assert(sOut6.toArrayRaw() == [1, 0]);
+
 }
