@@ -247,6 +247,52 @@ unittest {
 }
 
 /** 
+ * Wraps a Phobos-style input range as an input stream.
+ * Params:
+ *   range = The range to wrap in an input stream.
+ * Returns: An input stream that reads data from the underlying input range.
+ */
+auto asInputStream(E, R)(R range) if (isInputRange!R) {
+    alias elementType = ElementType!R;
+    static assert(
+        is(elementType == E),
+        "Stream element type of " ~ E.stringof ~
+        " does not match range element type of " ~ elementType.stringof
+    );
+    struct InputRangeStream {
+        private R range;
+
+        int read(E[] buffer) {
+            int readCount = 0;
+            while (readCount < buffer.length && !this.range.empty()) {
+                E element = this.range.front();
+                buffer[readCount++] = element;
+                this.range.popFront();
+            }
+            return readCount;
+        }
+    }
+    return InputRangeStream(range);
+}
+
+unittest {
+    int[] r = [1, 2, 3, 4, 5, 6];
+    auto s = asInputStream!int(r);
+    int[] buffer = new int[4];
+    assert(s.read(buffer) == 4);
+    assert(buffer == [1, 2, 3, 4]);
+
+    auto s2 = asInputStream!dchar("Hello world");
+    dchar[] buffer2 = new dchar[4];
+    assert(s2.read(buffer2) == 4);
+    assert(buffer2 == "Hell");
+    assert(s2.read(buffer2) == 4);
+    assert(buffer2 == "o wo");
+    assert(s2.read(buffer2) == 3);
+    assert(buffer2 == "rldo");
+}
+
+/** 
  * Determines if the given stream type is an output stream for writing data of
  * the given type.
  * Returns: `true` if the given stream type is an output stream.
@@ -323,6 +369,33 @@ unittest {
     assert(s.toArray() == []);
     o.put([1, 2, 3]);
     assert(s.toArray() == [1, 2, 3]);
+}
+
+/** 
+ * Wraps a Phobos-style output range as an output stream.
+ * Params:
+ *   range = The output range to wrap.
+ * Returns: An output stream that writes data to the underlying output range.
+ */
+auto asOutputStream(E, R)(R range) if (isOutputRange!(R, E)) {
+    struct OutputRangeStream {
+        private R range;
+
+        int write(E[] buffer) {
+            this.range.put(buffer);
+            return cast(int) buffer.length;
+        }
+    }
+    return OutputRangeStream(range);
+}
+
+unittest {
+    ubyte[] r = new ubyte[8192];
+    auto s = asOutputStream!ubyte(r);
+    assert(s.write([1, 2, 3]) == 3);
+    assert(r[0 .. 3] == [1, 2, 3]);
+    assert(s.write([4, 5]) == 2);
+    assert(r[0 .. 5] == [1, 2, 3, 4, 5]);
 }
 
 /** 
@@ -475,24 +548,36 @@ class StreamException : Exception {
     mixin basicExceptionCtors;
 }
 
+/** 
+ * An input stream that always reads 0 elements.
+ */
 struct NoOpInputStream(T) {
     int read(T[] buffer) {
         return 0;
     }
 }
 
+/** 
+ * An output stream that always writes 0 elements.
+ */
 struct NoOpOutputStream(T) {
     int write(T[] buffer) {
         return 0;
     }
 }
 
+/** 
+ * An input stream that always returns a -1 error response.
+ */
 struct ErrorInputStream(T) {
     int read(T[] buffer) {
         return -1;
     }
 }
 
+/** 
+ * An output stream that always returns a -1 error response.
+ */
 struct ErrorOutputStream(T) {
     int write(T[] buffer) {
         return -1;

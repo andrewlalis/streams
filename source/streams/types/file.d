@@ -92,6 +92,6 @@ unittest {
     try {
         std.file.remove(FILENAME);
     } catch (FileException e) {
-        stderr.writefln!"Failed to delete file %s: %s"(FILENAME, e.msg);
+        stderr.writefln!"Failed to delete file %s: %s"(FILENAME, e.msg); // cov-ignore
     }
 }

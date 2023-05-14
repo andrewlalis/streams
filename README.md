@@ -11,7 +11,8 @@ some element type `T`.
 
 Similar to [Phobos' ranges](https://dlang.org/phobos/std_range.html), streams
 are defined and type-checked using a _primitives_ package that contains various
-compile-time functions like `isInputRange` and `isOutputRange`. Let's look at an example where we write some data to a socket using streams:
+compile-time functions like `isInputRange` and `isOutputRange`. Let's look at
+an example where we write some data to a socket using streams:
 
 ```d
 import streams;
@@ -27,6 +28,24 @@ Stream primitives are generally compatible with [BetterC](https://dlang.org/spec
 although there may be incompatibilities in various implementations where
 dynamic arrays or exceptions are used. You may certainly write streams that are
 safe, no-gc compatible, pure, and so on.
+
+## Features
+
+- Compile-time functions for identifying streams of various kinds, useful for
+when you want to accept streams as parameters or use them in templates.
+- Convenience functions for dealing with streams, like reading all elements to
+a buffer, or transfering the contents of one stream to another.
+- Pre-defined stream implementations for common use cases:
+    - `ArrayInputStream` and `ArrayOutputStream` for performing IO on in-memory
+    arrays.
+    - `DataInputStream` and `DataOutputStream` are wrappers over any `ubyte`
+    stream, adding the ability to read and write scalar values (`int`, `float`,
+    `bool`, `char`, etc.) and static arrays, by automatically serializing them.
+    - `FileInputStream` and `FileOutputStream` are `ubyte` streams for reading
+    and writing files using `std.stdio : File`.
+    - `SocketInputStream` and `SocketOutputStream` are `ubyte` streams for
+    reading and writing to sockets using `std.socket : Socket`.
+- Functions to convert between streams and Phobos ranges.
 
 ## Difference with Ranges
 
