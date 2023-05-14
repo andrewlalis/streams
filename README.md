@@ -1,5 +1,9 @@
 # Streams
 
+![DUB](https://img.shields.io/dub/dt/streams)
+![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/andrewlalis/streams/run-tests.yml?branch=main&label=tests)
+![DUB](https://img.shields.io/dub/l/streams)
+
 A collection of useful stream primitives and implementations. Designed to be a
 candidate for inclusion in Phobos. The concept of a stream is of a component
 that implements a `int read(T[] buffer)` or `int write(T[] buffer)` method for
