@@ -81,14 +81,6 @@ unittest {
     // Test flushing of file.
     const FILENAME = "test-file-flush";
     File f1 = File(FILENAME, "wb");
-    scope(exit) {
-        f1.close();
-        try {
-            std.file.remove(FILENAME);
-        } catch (FileException e) {
-            stderr.writefln!"Failed to remove test file %s: %s"(FILENAME, e.msg);
-        }
-    }
     auto sOut = FileOutputStream(f1);
     sOut.flush();
     assert(getSize(FILENAME) == 0);
@@ -96,4 +88,10 @@ unittest {
     dOut.write!(char[5])("Hello");
     sOut.flush();
     assert(readText(FILENAME) == "Hello");
+    f1.close();
+    try {
+        std.file.remove(FILENAME);
+    } catch (FileException e) {
+        stderr.writefln!"Failed to delete file %s: %s"(FILENAME, e.msg);
+    }
 }
