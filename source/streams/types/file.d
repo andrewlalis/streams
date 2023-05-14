@@ -82,6 +82,7 @@ unittest {
     const FILENAME = "test-file-flush";
     File f1 = File(FILENAME, "wb");
     scope(exit) {
+        f1.close();
         try {
             std.file.remove(FILENAME);
         } catch (FileException e) {
