@@ -54,15 +54,15 @@ bool isSomeInputStream(StreamType)() {
 
 unittest {
     struct S1 {
-        int read(ubyte[] buffer) { return 0; }
+        int read(ubyte[] buffer) { return 0; } // cov-ignore
     }
     assert(isSomeInputStream!S1);
     struct S2 {
-        int read(bool[] buffer) { return 42; }
+        int read(bool[] buffer) { return 42; } // cov-ignore
     }
     assert(isSomeInputStream!S2);
     struct S3 {
-        int read(bool[] buffer, int otherArg) { return 0; }
+        int read(bool[] buffer, int otherArg) { return 0; } // cov-ignore
     }
     assert(!isSomeInputStream!S3);
     struct S4 {
@@ -80,7 +80,7 @@ unittest {
     }
     assert(isSomeInputStream!I1);
     class C1 {
-        int read(ubyte[] buffer) { return 0; }
+        int read(ubyte[] buffer) { return 0; } // cov-ignore
     }
     assert(isSomeInputStream!C1);
 }
@@ -108,15 +108,15 @@ bool isSomeOutputStream(StreamType)() {
 
 unittest {
     struct S1 {
-        int write(ubyte[] buffer) { return 0; }
+        int write(ubyte[] buffer) { return 0; } // cov-ignore
     }
     assert(isSomeOutputStream!S1);
     struct S2 {
-        int write(bool[] buffer) { return 42; }
+        int write(bool[] buffer) { return 42; } // cov-ignore
     }
     assert(isSomeOutputStream!S2);
     struct S3 {
-        int write(bool[] buffer, int otherArg) { return 0; }
+        int write(bool[] buffer, int otherArg) { return 0; } // cov-ignore
     }
     assert(!isSomeOutputStream!S3);
     struct S4 {
@@ -148,7 +148,7 @@ unittest {
     // Test a valid input stream.
     struct S1 {
         int read(ubyte[] buffer) {
-            return 0; // Don't do anything with the data.
+            return 0; // cov-ignore
         }
     }
     assert(isInputStream!(S1, ubyte));
@@ -164,13 +164,13 @@ unittest {
     assert(!isInputStream!(S3, ubyte));
     struct S4 {
         int read() {
-            return 0; // Missing required arguments.
+            return 0; // cov-ignore
         }
     }
     assert(!isInputStream!(S4, ubyte));
     class C1 {
         int read(char[] buffer) {
-            return 0;
+            return 0; // cov-ignore
         }
     }
     assert(isInputStream!(C1, char));
@@ -234,6 +234,16 @@ unittest {
     auto s = inputStreamFor!ubyte([1, 2, 3]);
     auto r = asInputRange!ubyte(s);
     assert(isInputRange!(typeof(r)));
+    assert(!r.empty());
+    assert(r.front() == 1);
+    r.popFront();
+    assert(!r.empty());
+    assert(r.front() == 2);
+    r.popFront();
+    assert(!r.empty());
+    assert(r.front() == 3);
+    r.popFront();
+    assert(r.empty());
 }
 
 /** 
@@ -253,7 +263,7 @@ unittest {
     // Test a valid output stream.
     struct S1 {
         int write(ref ubyte[] buffer) {
-            return 0; // Don't do anything with the data.
+            return 0; // cov-ignore
         }
     }
     assert(isOutputStream!(S1, ubyte));
@@ -269,7 +279,7 @@ unittest {
     assert(!isOutputStream!(S3, ubyte));
     struct S4 {
         int write() {
-            return 0; // Missing required arguments.
+            return 0; // cov-ignore
         }
     }
     assert(!isOutputStream!(S4, ubyte));
@@ -310,6 +320,9 @@ unittest {
     auto s = ArrayOutputStream!ubyte();
     auto o = asOutputRange!ubyte(s);
     assert(isOutputRange!(typeof(o), ubyte));
+    assert(s.toArray() == []);
+    o.put([1, 2, 3]);
+    assert(s.toArray() == [1, 2, 3]);
 }
 
 /** 
@@ -325,13 +338,13 @@ bool isSomeStream(StreamType)() {
 unittest {
     struct S1 {
         int read(ubyte[] buffer) {
-            return 0;
+            return 0; // cov-ignore
         }
     }
     assert(isSomeStream!S1);
     struct S2 {
         int write(ubyte[] buffer) {
-            return 0;
+            return 0; // cov-ignore
         }
     }
     assert(isSomeStream!S2);
@@ -391,14 +404,14 @@ bool isClosableStream(StreamType)() {
 unittest {
     struct S1 {
         int read(ubyte[] buffer) {
-            return 0;
+            return 0; // cov-ignore
         }
         void close() {}
     }
     assert(isClosableStream!S1);
     struct S2 {
         int read(ubyte[] buffer) {
-            return 0;
+            return 0; // cov-ignore
         }
     }
     assert(!isClosableStream!S2);
@@ -435,14 +448,14 @@ bool isFlushableStream(StreamType)() {
 unittest {
     struct S1 {
         int write(ubyte[] buffer) {
-            return 0;
+            return 0; // cov-ignore
         }
         void flush() {}
     }
     assert(isFlushableStream!S1);
     struct S2 {
         int write(ubyte[] buffer) {
-            return 0;
+            return 0; // cov-ignore
         }
     }
     assert(!isFlushableStream!S2);
@@ -460,4 +473,44 @@ class StreamException : Exception {
     import std.exception;
 
     mixin basicExceptionCtors;
+}
+
+struct NoOpInputStream(T) {
+    int read(T[] buffer) {
+        return 0;
+    }
+}
+
+struct NoOpOutputStream(T) {
+    int write(T[] buffer) {
+        return 0;
+    }
+}
+
+struct ErrorInputStream(T) {
+    int read(T[] buffer) {
+        return -1;
+    }
+}
+
+struct ErrorOutputStream(T) {
+    int write(T[] buffer) {
+        return -1;
+    }
+}
+
+unittest {
+    auto s1 = NoOpInputStream!ubyte();
+    ubyte[] buffer = new ubyte[3];
+    assert(s1.read(buffer) == 0);
+    assert(buffer == [0, 0, 0]);
+    
+    auto s2 = NoOpOutputStream!ubyte();
+    assert(s2.write(buffer) == 0);
+
+    auto s3 = ErrorInputStream!ubyte();
+    assert(s3.read(buffer) == -1);
+
+    auto s4 = ErrorOutputStream!ubyte();
+    assert(s4.write(buffer) == -1);
 }

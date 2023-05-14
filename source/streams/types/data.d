@@ -305,4 +305,16 @@ unittest {
     DataReadResult!(ubyte[4]) result3 = dataIn3.read!(ubyte[4])();
     assert(result3.value.isNull);
     assert(result3.error.get().lastStreamResult == 0);
+
+    // Test that writing a value to an output stream that errors, also causes an error.
+    auto sOut4 = ErrorOutputStream!ubyte();
+    auto dataOut4 = dataOutputStreamFor(sOut4);
+    Nullable!DataStreamError error4 = dataOut4.write(1);
+    assert(!error4.isNull);
+
+    // Test that writing a static array fails if writing one element fails.
+    auto sOut5 = ErrorOutputStream!ubyte();
+    auto dataOut5 = dataOutputStreamFor(sOut5);
+    Nullable!DataStreamError error5 = dataOut5.write!(int[3])([3, 2, 1]);
+    assert(!error5.isNull);
 }
