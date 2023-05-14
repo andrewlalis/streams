@@ -72,6 +72,7 @@ struct FileOutputStream {
 unittest {
     import streams;
     import std.file;
+    import std.stdio;
 
     assert(isOutputStream!(FileOutputStream, ubyte));
     assert(isClosableStream!FileOutputStream);
@@ -81,7 +82,11 @@ unittest {
     const FILENAME = "test-file-flush";
     File f1 = File(FILENAME, "wb");
     scope(exit) {
-        std.file.remove(FILENAME);
+        try {
+            std.file.remove(FILENAME);
+        } catch (FileException e) {
+            stderr.writefln!"Failed to remove test file %s: %s"(FILENAME, e.msg);
+        }
     }
     auto sOut = FileOutputStream(f1);
     sOut.flush();
