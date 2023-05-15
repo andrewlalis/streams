@@ -136,7 +136,7 @@ unittest {
  * Params:
  *   S = The stream to get the type of.
  */
-template StreamType(alias S) if (isSomeStream!S) {
+template StreamType(S) if (isSomeStream!S) {
     static if (hasMember!(S, "read")) {
         alias StreamType = ElementType!(Parameters!(S.read)[0]);
     } else {
@@ -213,7 +213,7 @@ unittest {
  *   stream = The stream to wrap.
  * Returns: The input range.
  */
-auto asInputRange(E, S)(ref S stream) if (isInputStream!(S, E)) {
+auto asInputRange(S, E = StreamType!S)(ref S stream) if (isInputStream!(S, E)) {
     struct InputStreamRange {
         import std.typecons;
 
@@ -251,7 +251,7 @@ auto asInputRange(E, S)(ref S stream) if (isInputStream!(S, E)) {
 unittest {
     import streams;
     auto s = arrayInputStreamFor!ubyte([1, 2, 3]);
-    auto r = asInputRange!ubyte(s);
+    auto r = asInputRange(s);
     assert(isInputRange!(typeof(r)));
     assert(!r.empty());
     assert(r.front() == 1);
@@ -271,13 +271,7 @@ unittest {
  *   range = The range to wrap in an input stream.
  * Returns: An input stream that reads data from the underlying input range.
  */
-auto asInputStream(E, R)(R range) if (isInputRange!R) {
-    alias elementType = ElementType!R;
-    static assert(
-        is(elementType == E),
-        "Stream element type of " ~ E.stringof ~
-        " does not match range element type of " ~ elementType.stringof
-    );
+auto asInputStream(R, E = ElementType!R)(R range) if (isInputRange!R) {
     struct InputRangeStream {
         private R range;
 
@@ -296,12 +290,12 @@ auto asInputStream(E, R)(R range) if (isInputRange!R) {
 
 unittest {
     int[] r = [1, 2, 3, 4, 5, 6];
-    auto s = asInputStream!int(r);
+    auto s = asInputStream(r);
     int[] buffer = new int[4];
     assert(s.read(buffer) == 4);
     assert(buffer == [1, 2, 3, 4]);
 
-    auto s2 = asInputStream!dchar("Hello world");
+    auto s2 = asInputStream("Hello world");
     dchar[] buffer2 = new dchar[4];
     assert(s2.read(buffer2) == 4);
     assert(buffer2 == "Hell");
@@ -369,7 +363,7 @@ unittest {
  *   stream = The stream to wrap.
  * Returns: The output range.
  */
-auto asOutputRange(E, S)(ref S stream) if (isOutputStream!(S, E)) {
+auto asOutputRange(S, E = StreamType!S)(ref S stream) if (isOutputStream!(S, E)) {
     struct StreamOutputRange {
         private S* stream;
         
@@ -383,7 +377,7 @@ auto asOutputRange(E, S)(ref S stream) if (isOutputStream!(S, E)) {
 unittest {
     import streams;
     auto s = arrayOutputStreamFor!ubyte;
-    auto o = asOutputRange!ubyte(s);
+    auto o = asOutputRange(s);
     assert(isOutputRange!(typeof(o), ubyte));
     assert(s.toArray() == []);
     o.put([1, 2, 3]);
@@ -396,7 +390,7 @@ unittest {
  *   range = The output range to wrap.
  * Returns: An output stream that writes data to the underlying output range.
  */
-auto asOutputStream(E, R)(R range) if (isOutputRange!(R, E)) {
+auto asOutputStream(R, E = ElementType!R)(R range) if (isOutputRange!(R, E)) {
     struct OutputRangeStream {
         private R range;
 
@@ -410,11 +404,76 @@ auto asOutputStream(E, R)(R range) if (isOutputRange!(R, E)) {
 
 unittest {
     ubyte[] r = new ubyte[8192];
-    auto s = asOutputStream!ubyte(r);
+    auto s = asOutputStream(r);
     assert(s.write([1, 2, 3]) == 3);
     assert(r[0 .. 3] == [1, 2, 3]);
     assert(s.write([4, 5]) == 2);
     assert(r[0 .. 5] == [1, 2, 3, 4, 5]);
+}
+
+/** 
+ * Converts the given range to a stream. Input ranges are converted to input
+ * streams, and output ranges are converted to output streams. Note that if
+ * the given range is both an input and an output range, an input stream is
+ * returned.
+ * Params:
+ *   range = The range to convert.
+ * Returns: A stream that wraps the given range.
+ */
+auto asStream(R, E = ElementType!R)(R range) if (isInputRange!R || isOutputRange!(R, E)) {
+    static if (isInputRange!R) {
+        return asInputStream!(R, E)(range);
+    } else {
+        return asOutputStream!(R, E)(range);
+    }
+}
+
+unittest {
+    import streams;
+    
+    int[] inputRange = new int[10];
+    auto inputStream = asStream(inputRange);
+    assert(isInputStream!(typeof(inputStream), int));
+    // First check that something which is both an input and output range defaults to input stream.
+    int[] outputRange;
+    auto outputStream = asStream(outputRange);
+    assert(isInputStream!(typeof(outputStream), int));
+    // Now check a "pure" output range.
+    
+    auto sOut = byteArrayOutputStream();
+    auto pureOutputRange = asOutputRange(sOut);
+    assert(isOutputRange!(typeof(pureOutputRange), ubyte) && !isInputRange!(typeof(pureOutputRange)));
+    // We do need to use explicit template arguments here.
+    auto pureOutputStream = asStream!(typeof(pureOutputRange), ubyte)(pureOutputRange);
+    assert(isOutputStream!(typeof(pureOutputStream), ubyte));
+}
+
+/** 
+ * Converts the given stream to a range. Input streams are converted to input
+ * ranges, and output streams are converted to output ranges.
+ * Params:
+ *   stream = The stream to convert.
+ * Returns: A range that wraps the given stream.
+ */
+auto asRange(S, E = StreamType!S)(ref S stream) if (isSomeStream!S) {
+    static if (isSomeInputStream!S) {
+        return asInputRange!(S, E)(stream);
+    } else {
+        return asOutputRange!(S, E)(stream);
+    }
+}
+
+unittest {
+    import streams;
+
+    auto inputStream = arrayInputStreamFor!ubyte([1, 2, 3]);
+    auto inputRange = asRange(inputStream);
+    assert(isInputRange!(typeof(inputRange)));
+    assert(is(ElementType!(typeof(inputRange)) == ubyte));
+
+    auto outputStream = byteArrayOutputStream();
+    auto outputRange = asRange(outputStream);
+    assert(isOutputRange!(typeof(outputRange), ubyte));
 }
 
 /** 
@@ -520,7 +579,6 @@ unittest {
  * Returns: `true` if the given argument is a flushable stream.
  */
 bool isFlushableStream(StreamType)() {
-    import std.traits;
     static if (
         isSomeOutputStream!StreamType &&
         hasMember!(StreamType, "flush") &&

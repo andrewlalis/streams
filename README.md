@@ -64,11 +64,14 @@ Furthermore, streams of this nature are a common feature in many other
 programming languages, and thus provides a bit of a "comfort zone" to help
 welcome programmers.
 
-For compatibility, this library provides the functions `asInputRange` and
-`asOutputRange` to wrap an input stream as a Phobos input range and an output
-stream as a Phobos output range, respectively. Note that due to the inherently
-un-buffered nature of streams, these range implementations may not be as
-performant as existing range implementations for certain resources.
+### Range Compatibility
+
+- To convert a range to a stream: `auto stream = asStream(range);` You can also
+use `asInputStream` and `asOutputStream` to be more explicit when dealing with
+things that behave as both an input and output range.
+- To convert a stream to a range: `auto range = asRange(stream);` You can also
+use `asInputRange` and `asOutputRange` to be more explicit when dealing with
+streams that implement both input and output functions.
 
 ## Development
 
@@ -78,7 +81,11 @@ any compiler, and run `dub test` to test the library.
 Documentation can be generated with `./gen_docs.d`, which internally uses
 Adrdox to generate documentation at `generated-docs/`.
 
-This codebase is expected to maintain a high code-quality, and while no
-automated checks are in-place, it is expected that pull requests that add
-significant new code adhere to the conventions already in use, and document
-any new symbols you added.
+Tests and coverage are run automatically with GitHub Actions. See `gen_coverage.d`
+for a look at how coverage is computed in detail, but essentially:
+
+1. We generate coverage `.lst` files using the standard compiler unittest
+coverage feature.
+2. The `.lst` files are parsed, and lines with `// cov-ignore` comments are
+ignored.
+3. We compute the % of lines covered, and if it's below some threshold, fail.
