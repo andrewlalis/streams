@@ -8,6 +8,42 @@ import streams.primitives;
 import std.range;
 
 /** 
+ * A struct that, when initialized with an input stream, acts as a Phobos-style
+ * input range for elements of the same type.
+ */
+struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
+    import std.typecons;
+
+    private S* stream;
+    private Nullable!E lastElement;
+    private int lastRead;
+
+    this(ref S stream) {
+        this.stream = &stream;
+        // Initialize the range with one element.
+        this.popFront();
+    }
+
+    void popFront() {
+        E[1] buffer;
+        this.lastRead = this.stream.read(buffer);
+        if (this.lastRead > 0) {
+            this.lastElement = nullable(buffer[0]);
+        } else {
+            this.lastElement = Nullable!E.init;
+        }
+    }
+
+    bool empty() {
+        return this.lastRead < 1;
+    }
+
+    E front() {
+        return this.lastElement.get();
+    }
+}
+
+/** 
  * Wraps an existing input stream as a Phobos-style input range, to make any
  * input stream compatible with functions that take input ranges. The given
  * stream is stored as a pointer in the underlying range implementation, so you
@@ -26,38 +62,7 @@ import std.range;
  * Returns: The input range.
  */
 auto asInputRange(S, E = StreamType!S)(ref S stream) if (isInputStream!(S, E)) {
-    struct InputStreamRange {
-        import std.typecons;
-
-        private S* stream;
-        private Nullable!E lastElement;
-        private int lastRead;
-
-        this(ref S stream) {
-            this.stream = &stream;
-            // Initialize the range with one element.
-            this.popFront();
-        }
-
-        void popFront() {
-            E[1] buffer;
-            this.lastRead = this.stream.read(buffer);
-            if (this.lastRead > 0) {
-                this.lastElement = nullable(buffer[0]);
-            } else {
-                this.lastElement = Nullable!E.init;
-            }
-        }
-
-        bool empty() {
-            return this.lastRead < 1;
-        }
-
-        E front() {
-            return this.lastElement.get();
-        }
-    }
-    return InputStreamRange(stream);
+    return InputStreamRange!(S, E)(stream);
 }
 
 unittest {
@@ -78,26 +83,30 @@ unittest {
 }
 
 /** 
+ * An input stream implementation that wraps around a Phobos-style input range.
+ */
+struct InputRangeStream(R, E = ElementType!R) if (isInputRange!R) {
+    private R range;
+
+    int read(E[] buffer) {
+        int readCount = 0;
+        while (readCount < buffer.length && !this.range.empty()) {
+            E element = this.range.front();
+            buffer[readCount++] = element;
+            this.range.popFront();
+        }
+        return readCount;
+    }
+}
+
+/** 
  * Wraps a Phobos-style input range as an input stream.
  * Params:
  *   range = The range to wrap in an input stream.
  * Returns: An input stream that reads data from the underlying input range.
  */
 auto asInputStream(R, E = ElementType!R)(R range) if (isInputRange!R) {
-    struct InputRangeStream {
-        private R range;
-
-        int read(E[] buffer) {
-            int readCount = 0;
-            while (readCount < buffer.length && !this.range.empty()) {
-                E element = this.range.front();
-                buffer[readCount++] = element;
-                this.range.popFront();
-            }
-            return readCount;
-        }
-    }
-    return InputRangeStream(range);
+    return InputRangeStream!(R, E)(range);
 }
 
 unittest {
@@ -115,6 +124,18 @@ unittest {
     assert(buffer2 == "o wo");
     assert(s2.read(buffer2) == 3);
     assert(buffer2 == "rldo");
+}
+
+/** 
+ * A struct that, when initialized with an output stream, acts as a Phobos-
+ * style output range for elements of the same type.
+ */
+struct OutputStreamRange(S, E = StreamType!S) if (isOutputStream!(S, E)) {
+    private S* stream;
+    
+    void put(E[] buffer) {
+        this.stream.write(buffer);
+    }
 }
 
 /** 
@@ -137,14 +158,7 @@ unittest {
  * Returns: The output range.
  */
 auto asOutputRange(S, E = StreamType!S)(ref S stream) if (isOutputStream!(S, E)) {
-    struct StreamOutputRange {
-        private S* stream;
-        
-        void put(E[] buffer) {
-            this.stream.write(buffer);
-        }
-    }
-    return StreamOutputRange(&stream);
+    return OutputStreamRange!(S, E)(&stream);
 }
 
 unittest {
@@ -158,21 +172,25 @@ unittest {
 }
 
 /** 
+ * An output stream implementation that wraps a Phobos-style output range.
+ */
+struct OutputRangeStream(R, E = ElementType!R) if (isOutputRange!(R, E)) {
+    private R range;
+
+    int write(E[] buffer) {
+        this.range.put(buffer);
+        return cast(int) buffer.length;
+    }
+}
+
+/** 
  * Wraps a Phobos-style output range as an output stream.
  * Params:
  *   range = The output range to wrap.
  * Returns: An output stream that writes data to the underlying output range.
  */
 auto asOutputStream(R, E = ElementType!R)(R range) if (isOutputRange!(R, E)) {
-    struct OutputRangeStream {
-        private R range;
-
-        int write(E[] buffer) {
-            this.range.put(buffer);
-            return cast(int) buffer.length;
-        }
-    }
-    return OutputRangeStream(range);
+    return OutputRangeStream!(R, E)(range);
 }
 
 unittest {

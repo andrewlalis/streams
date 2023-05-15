@@ -49,24 +49,15 @@ version (D_BetterC) {} else {
  * Params:
  *   input = The input stream to read from.
  *   output = The output stream to write to.
- *   bufferSize = The size of the internal buffer to use for reading.
  */
-void transferTo(I, O, E = StreamType!I)(
+void transferTo(I, O, E = StreamType!I, uint BufferSize = 8192)(
     ref I input,
-    ref O output,
-    uint bufferSize = 8192
+    ref O output
 ) if (isInputStream!(I, E) && isOutputStream!(O, E)) {
-    import core.stdc.stdlib : malloc, free;
-    E* bufferPtr = cast(E*) malloc(bufferSize * E.sizeof);
-    if (bufferPtr is null) {
-        throw new Error("Failed to allocate buffer for transfering elements from input stream to output stream.");
-    }
-    scope(exit) {
-        free(bufferPtr);
-    }
+    E[BufferSize] buffer;
     int itemsRead;
-    while ((itemsRead = input.read(bufferPtr[0 .. bufferSize])) > 0) {
-        int written = output.write(bufferPtr[0 .. itemsRead]);
+    while ((itemsRead = input.read(buffer[])) > 0) {
+        int written = output.write(buffer[0 .. itemsRead]);
         if (written != itemsRead) {
             throw new StreamException("Failed to transfer bytes.");
         }
