@@ -10,9 +10,13 @@ import std.typecons;
 
 const uint DEFAULT_BUFFER_SIZE = 4096;
 
-struct BufferedInputStream(S, E = StreamType!E) if (isInputStream!(S, E)) {
+struct BufferedInputStream(S, E = StreamType!S) if (isInputStream!(S, E)) {
     private S* stream;
     private const Nullable!E delimiter = Nullable!E.init;
+
+    this(ref S stream) {
+        this.stream = &stream;
+    }
 
     int read(E[] buffer) {
         uint bufferIndex = 0;
@@ -33,7 +37,14 @@ unittest {
     import streams;
     import core.thread;
 
-    // TODO: Add tests!
+    auto sIn1 = arrayInputStreamFor!int([1, 2, 3, 4]);
+    auto bufIn1 = BufferedInputStream!(typeof(sIn1), int)(sIn1);
+    int[1] buf1;
+    assert(bufIn1.read(buf1[]) == 1);
+    assert(buf1 == [1]);
+    int[4] buf2;
+    assert(bufIn1.read(buf2[]) == 3);
+
 }
 
 struct BufferedOutputStream(S, E = StreamType!E, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isOutputStream!(S, E)) {
@@ -65,15 +76,23 @@ struct BufferedOutputStream(S, E = StreamType!E, uint BufferSize = DEFAULT_BUFFE
             elementsWritten += elementsToWrite;
 
             if (this.nextIndex == BufferSize) {
-                this.flush();
+                int result = this.internalFlush();
+                if (result == -1) return -1; // If we detect an error, quit immediately.
             }
         }
         return elementsWritten;
     }
 
+    private int internalFlush() {
+        int result = this.stream.write(this.internalBuffer[0 .. this.nextIndex]);
+        if (result != -1) {
+            this.nextIndex = 0;
+        }
+        return result;
+    }
+
     void flush() {
-        this.stream.write(this.internalBuffer[0 .. this.nextIndex]);
-        this.nextIndex = 0;
+        this.internalFlush();
     }
 }
 
