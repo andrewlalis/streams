@@ -132,6 +132,25 @@ unittest {
 }
 
 /** 
+ * A template that evaluates to the type of a given input or output stream.
+ * Params:
+ *   S = The stream to get the type of.
+ */
+template StreamType(alias S) if (isSomeStream!S) {
+    static if (hasMember!(S, "read")) {
+        alias StreamType = ElementType!(Parameters!(S.read)[0]);
+    } else {
+        alias StreamType = ElementType!(Parameters!(S.write)[0]);
+    }
+}
+
+unittest {
+    import streams;
+    auto sIn1 = arrayInputStreamFor!ubyte([1, 2, 3]);
+    assert(is(StreamType!(typeof(sIn1)) == ubyte));
+}
+
+/** 
  * Determines if the given stream type is an input stream for reading data of
  * the given type.
  * Returns: `true` if the given stream type is an input stream.
