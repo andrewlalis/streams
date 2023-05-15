@@ -31,6 +31,9 @@ module streams.primitives;
 import std.traits;
 import std.range;
 
+const INPUT_STREAM_METHOD = "readFromStream";
+const OUTPUT_STREAM_METHOD = "writeToStream";
+
 /** 
  * Determines if the given template argument is some form of input stream,
  * where an input stream is anything with a `read` method that takes a single
@@ -42,8 +45,8 @@ import std.range;
  */
 bool isSomeInputStream(StreamType)() {
     // Note: We use a cascading static check style so the compiler runs these checks in this order.
-    static if (hasMember!(StreamType, "read")) {
-        alias func = StreamType.read;
+    static if (__traits(hasMember, StreamType, INPUT_STREAM_METHOD)) {
+        alias func = __traits(getMember, StreamType, INPUT_STREAM_METHOD);
         static if (isCallable!func && is(ReturnType!func == int)) {
             static if (Parameters!func.length == 1) {
                 return isDynamicArray!(Parameters!func[0]);
@@ -54,33 +57,33 @@ bool isSomeInputStream(StreamType)() {
 
 unittest {
     struct S1 {
-        int read(ubyte[] buffer) { return 0; } // cov-ignore
+        int readFromStream(ubyte[] buffer) { return 0; } // cov-ignore
     }
     assert(isSomeInputStream!S1);
     struct S2 {
-        int read(bool[] buffer) { return 42; } // cov-ignore
+        int readFromStream(bool[] buffer) { return 42; } // cov-ignore
     }
     assert(isSomeInputStream!S2);
     struct S3 {
-        int read(bool[] buffer, int otherArg) { return 0; } // cov-ignore
+        int readFromStream(bool[] buffer, int otherArg) { return 0; } // cov-ignore
     }
     assert(!isSomeInputStream!S3);
     struct S4 {
-        void read(long[] buffer) {}
+        void readFromStream(long[] buffer) {}
     }
     assert(!isSomeInputStream!S4);
     struct S5 {
-        int read = 10;
+        int readFromStream = 10;
     }
     assert(!isSomeInputStream!S5);
     struct S6 {}
     assert(!isSomeInputStream!S6);
     interface I1 {
-        int read(ubyte[] buffer);
+        int readFromStream(ubyte[] buffer);
     }
     assert(isSomeInputStream!I1);
     class C1 {
-        int read(ubyte[] buffer) { return 0; } // cov-ignore
+        int readFromStream(ubyte[] buffer) { return 0; } // cov-ignore
     }
     assert(isSomeInputStream!C1);
 }
@@ -96,8 +99,8 @@ unittest {
  */
 bool isSomeOutputStream(StreamType)() {
     // Note: We use a cascading static check style so the compiler runs these checks in this order.
-    static if (hasMember!(StreamType, "write")) {
-        alias func = StreamType.write;
+    static if (__traits(hasMember, StreamType, OUTPUT_STREAM_METHOD)) {
+        alias func = __traits(getMember, StreamType, OUTPUT_STREAM_METHOD);
         static if (isCallable!func && is(ReturnType!func == int)) {
             static if (Parameters!func.length == 1) {
                 return isDynamicArray!(Parameters!func[0]);
@@ -108,23 +111,23 @@ bool isSomeOutputStream(StreamType)() {
 
 unittest {
     struct S1 {
-        int write(ubyte[] buffer) { return 0; } // cov-ignore
+        int writeToStream(ubyte[] buffer) { return 0; } // cov-ignore
     }
     assert(isSomeOutputStream!S1);
     struct S2 {
-        int write(bool[] buffer) { return 42; } // cov-ignore
+        int writeToStream(bool[] buffer) { return 42; } // cov-ignore
     }
     assert(isSomeOutputStream!S2);
     struct S3 {
-        int write(bool[] buffer, int otherArg) { return 0; } // cov-ignore
+        int writeToStream(bool[] buffer, int otherArg) { return 0; } // cov-ignore
     }
     assert(!isSomeOutputStream!S3);
     struct S4 {
-        void write(long[] buffer) {}
+        void writeToStream(long[] buffer) {}
     }
     assert(!isSomeOutputStream!S4);
     struct S5 {
-        int write = 10;
+        int writeToStream = 10;
     }
     assert(!isSomeOutputStream!S5);
     struct S6 {}
@@ -137,10 +140,10 @@ unittest {
  *   S = The stream to get the type of.
  */
 template StreamType(S) if (isSomeStream!S) {
-    static if (hasMember!(S, "read")) {
-        alias StreamType = ElementType!(Parameters!(S.read)[0]);
+    static if (isSomeInputStream!S) {
+        alias StreamType = ElementType!(Parameters!(__traits(getMember, S, INPUT_STREAM_METHOD))[0]);
     } else {
-        alias StreamType = ElementType!(Parameters!(S.write)[0]);
+        alias StreamType = ElementType!(Parameters!(__traits(getMember, S, OUTPUT_STREAM_METHOD))[0]);
     }
 }
 
@@ -157,7 +160,7 @@ unittest {
  */
 bool isInputStream(StreamType, DataType)() {
     static if (isSomeInputStream!StreamType) {
-        return is(Parameters!(StreamType.read)[0] == DataType[]);
+        return is(Parameters!(__traits(getMember, StreamType, INPUT_STREAM_METHOD))[0] == DataType[]);
     } else {
         return false;
     }
@@ -202,7 +205,7 @@ unittest {
  */
 bool isOutputStream(StreamType, DataType)() {
     static if (isSomeOutputStream!StreamType) {
-        return is(Parameters!(StreamType.write)[0] == DataType[]);
+        return is(Parameters!(__traits(getMember, StreamType, OUTPUT_STREAM_METHOD))[0] == DataType[]);
     } else {
         return false;
     }
@@ -211,7 +214,7 @@ bool isOutputStream(StreamType, DataType)() {
 unittest {
     // Test a valid output stream.
     struct S1 {
-        int write(ref ubyte[] buffer) {
+        int writeToStream(ref ubyte[] buffer) {
             return 0; // cov-ignore
         }
     }
@@ -221,13 +224,13 @@ unittest {
     struct S2 {}
     assert(!isOutputStream!(S2, ubyte));
     struct S3 {
-        void write(ubyte[] buffer) {
+        void writeToStream(ubyte[] buffer) {
             // Invalid return type!
         }
     }
     assert(!isOutputStream!(S3, ubyte));
     struct S4 {
-        int write() {
+        int writeToStream() {
             return 0; // cov-ignore
         }
     }

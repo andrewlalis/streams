@@ -153,6 +153,19 @@ struct DataInputStream(S) if (isByteInputStream!S) {
         }
     }
 
+    /** 
+     * Reads a value from the stream, or return a default value if reading
+     * fails for any reason.
+     * Params:
+     *   defaultValue = The default value to return if reading fails.
+     * Returns: The value that was read, or a default value.
+     */
+    T readOrDefault(T)(T defaultValue = T.init) {
+        DataReadResult!T result = this.read!T();
+        if (result.error.isNull) return result.value;
+        return defaultValue;
+    }
+
     version (D_BetterC) {} else {
         /** 
          * Reads a value from the stream and throws a StreamException if reading
