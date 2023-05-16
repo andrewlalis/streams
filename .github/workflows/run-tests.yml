@@ -28,6 +28,9 @@ jobs:
       
       - name: Run Tests
         run: dub -q test
+      
+      - name: Run BetterC Tests
+        run: dub -q test --config=betterC
 
       - name: Coverage
         run: ./gen_coverage.d

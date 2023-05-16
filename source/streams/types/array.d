@@ -39,7 +39,7 @@ struct ArrayInputStream(E) {
 }
 
 unittest {
-    import streams.primitives;
+    import streams.primitives : isSomeInputStream, isInputStream;
 
     assert(isSomeInputStream!(ArrayInputStream!int));
     assert(isInputStream!(ArrayInputStream!ubyte, ubyte));
@@ -152,7 +152,7 @@ ArrayOutputStream!ubyte byteArrayOutputStream() {
 }
 
 unittest {
-    import streams.primitives;
+    import streams.primitives : isSomeOutputStream;
 
     assert(isSomeOutputStream!(ArrayOutputStream!bool));
 
