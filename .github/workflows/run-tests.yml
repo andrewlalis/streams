@@ -26,6 +26,9 @@ jobs:
         with:
           compiler: ${{ matrix.compiler }}
       
+      - name: Show Versions
+        run: dub --version
+
       - name: Run Tests
         run: dub -q test
       
