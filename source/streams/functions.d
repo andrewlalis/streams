@@ -3,8 +3,7 @@
  */
 module streams.functions;
 
-import streams.primitives;
-import std.traits;
+import streams.primitives : StreamType, isInputStream, isOutputStream;
 
 version (D_BetterC) {} else {
     /**
@@ -66,7 +65,8 @@ int transferTo(I, O, E = StreamType!I, uint BufferSize = 4096)(
 }
 
 unittest {
-    import streams;
+    import streams.types.array : arrayInputStreamFor, arrayOutputStreamFor;
+    import streams.primitives : ErrorOutputStream;
 
     // Check that transferring does indeed work by transferring the LICENSE file to memory.
     char[12] expected = "Hello world!";
