@@ -1,6 +1,5 @@
 /** 
- * A collection of helper functions that augment the basic `read` and `write`
- * functions of input and output streams.
+ * A collection of helper functions for working with streams.
  */
 module streams.functions;
 

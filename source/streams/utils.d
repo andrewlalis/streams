@@ -125,6 +125,19 @@ struct AppendableBuffer(T) {
     }
 
     /** 
+     * Gets a copy of this buffer's contents in a new allocated array. You must
+     * free this array yourself.
+     * Returns: The array copy.
+     */
+    T[] toArrayCopy() {
+        T* copyPtr = cast(T*) malloc(this.length() * T.sizeof);
+        if (copyPtr is null) assert(false, "Could not allocate memory for arrayCopy.");
+        T[] copy = copyPtr[0 .. this.length()];
+        copy[0 .. $] = this.toArray()[0 .. $];
+        return copy;
+    }
+
+    /** 
      * Gets the length of the buffer, or the total number of items in it.
      * Returns: The buffer's length.
      */
@@ -171,3 +184,20 @@ struct AppendableBuffer(T) {
     }
 }
 
+unittest {
+    auto ab1 = AppendableBuffer!ubyte(4, BufferAllocationStrategy.Doubling);
+    assert(ab1.length() == 0);
+    assert(ab1.toArray() == []);
+    ubyte[3] buf = [1, 2, 3];
+    ab1.appendItems(buf);
+    assert(ab1.length() == 3);
+    assert(ab1.toArray() == [1, 2, 3]);
+
+    buf = [4, 5, 6];
+    ab1.appendItems(buf);
+    assert(ab1.toArray() == [1, 2, 3, 4, 5, 6]);
+    ubyte[] copy = ab1.toArrayCopy();
+    assert(copy.length == 6);
+    import core.stdc.stdlib : free;
+    free(copy.ptr);
+}
