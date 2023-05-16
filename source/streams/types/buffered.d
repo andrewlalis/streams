@@ -5,19 +5,33 @@
  */
 module streams.types.buffered;
 
-import streams.primitives;
-import std.typecons;
+import streams.primitives : StreamType, isInputStream, isOutputStream;
 
 const uint DEFAULT_BUFFER_SIZE = 4096;
 
+/** 
+ * A buffered wrapper around another input stream, that buffers reads according
+ * to the size of buffer provided to its `readFromStream` method.
+ */
 struct BufferedInputStream(S, E = StreamType!S) if (isInputStream!(S, E)) {
     private S* stream;
-    private const Nullable!E delimiter = Nullable!E.init;
 
+    /** 
+     * Constructs a buffered input stream to buffer reads from the given stream.
+     * Params:
+     *   stream = The stream to read from.
+     */
     this(ref S stream) {
         this.stream = &stream;
     }
 
+    /** 
+     * Reads `buffer.length` items from the stream, and returning only once
+     * exactly that many items have been read, or an error occurs.
+     * Params:
+     *   buffer = The buffer to read items to.
+     * Returns: `buffer.length` on success, or `-1` on error.
+     */
     int readFromStream(E[] buffer) {
         uint bufferIndex = 0;
         while (bufferIndex < buffer.length) {
@@ -36,7 +50,8 @@ struct BufferedInputStream(S, E = StreamType!S) if (isInputStream!(S, E)) {
 unittest {
     import streams.types.array : arrayInputStreamFor;
 
-    auto sIn1 = arrayInputStreamFor!int([1, 2, 3, 4]);
+    int[4] sInData = [1, 2, 3, 4];
+    auto sIn1 = arrayInputStreamFor!int(sInData);
     auto bufIn1 = BufferedInputStream!(typeof(sIn1), int)(sIn1);
     int[1] buf1;
     assert(bufIn1.readFromStream(buf1[]) == 1);
@@ -46,15 +61,31 @@ unittest {
 
 }
 
+/** 
+ * A buffered wrapper around another output stream, that buffers writes up to
+ * `BufferSize` elements before flushing the buffer to the underlying stream.
+ */
 struct BufferedOutputStream(S, E = StreamType!E, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isOutputStream!(S, E)) {
     private S* stream;
     private E[BufferSize] internalBuffer;
     private uint nextIndex = 0;
 
+    /** 
+     * Constructs a buffered output stream to buffer writes to the given stream.
+     * Params:
+     *   stream = The stream to write to.
+     */
     this(ref S stream) {
         this.stream = &stream;
     }
 
+    /** 
+     * Writes the given items this stream's internal buffer, and flushes if we
+     * reach the buffer's capacity.
+     * Params:
+     *   buffer = The elements to write.
+     * Returns: The number of elements that were written, or -1 in case of error.
+     */
     int writeToStream(E[] buffer) {
         int elementsWritten = 0;
         uint bufferIndex = 0;
@@ -90,26 +121,32 @@ struct BufferedOutputStream(S, E = StreamType!E, uint BufferSize = DEFAULT_BUFFE
         return result;
     }
 
+    /** 
+     * Manually invokes a flush to the underlying stream.
+     */
     void flushStream() {
         this.internalFlush();
     }
 }
 
 unittest {
+    import streams.primitives : isFlushableStream;
     import streams.types.array : byteArrayOutputStream;
+
     auto sOut1 = byteArrayOutputStream();
     auto bufOut1 = BufferedOutputStream!(typeof(sOut1), ubyte, 4)(sOut1);
 
     assert(isOutputStream!(typeof(bufOut1), ubyte));
     assert(isFlushableStream!(typeof(bufOut1)));
 
-    assert(bufOut1.writeToStream([1]) == 1);
+    ubyte[5] data = [1, 2, 3, 4, 5];
+    assert(bufOut1.writeToStream(data[0 .. 1]) == 1);
     assert(sOut1.toArrayRaw().length == 0);
-    assert(bufOut1.writeToStream([2]) == 1);
+    assert(bufOut1.writeToStream(data[1 .. 2]) == 1);
     assert(sOut1.toArrayRaw().length == 0);
-    assert(bufOut1.writeToStream([3, 4]) == 2);
+    assert(bufOut1.writeToStream(data[2 .. 4]) == 2);
     assert(sOut1.toArrayRaw() == [1, 2, 3, 4]);
-    assert(bufOut1.writeToStream([5]) == 1);
+    assert(bufOut1.writeToStream(data[4 .. 5]) == 1);
     assert(sOut1.toArrayRaw().length == 4);
     bufOut1.flushStream();
     assert(sOut1.toArrayRaw() == [1, 2, 3, 4, 5]);

@@ -19,6 +19,7 @@ version (D_BetterC) {
         runTests!(streams.functions);
         runTests!(streams.interfaces);
         runTests!(streams.types.array);
+        runTests!(streams.types.buffered);
         runTests!(streams.types.data);
         runTests!(streams.types.file);
         runTests!(streams.types.socket);
