@@ -5,46 +5,48 @@ module streams.interfaces;
 
 import streams.primitives;
 
+version (D_BetterC) {} else {
+
 /** 
  * Interface defining an input stream object that reads elements from some
  * resource.
  */
-interface InputStream(DataType) {
+interface InputStream(E) {
     /** 
      * Reads elements from a resource and writes them to `buffer`.
      * Params:
      *   buffer = The buffer to read elements into.
      * Returns: The number of elements that were read, or -1 in case of error.
      */
-    int read(DataType[] buffer);
+    int readFromStream(E[] buffer);
 }
 
 /** 
  * Interface defining an output stream object that writes elements to some
  * resource.
  */
-interface OutputStream(DataType) {
+interface OutputStream(E) {
     /** 
      * Writes elements from `buffer` to a resource.
      * Params:
      *   buffer = The buffer containing elements to write.
      * Returns: The number of elements that were written, or -1 in case of error.
      */
-    int write(DataType[] buffer);
+    int writeToStream(E[] buffer);
 }
 
 /** 
  * Interface defining a stream that is closable.
  */
 interface ClosableStream {
-    void close();
+    void closeStream();
 }
 
 /** 
  * Interface defining a stream that is flushable.
  */
 interface FlushableStream {
-    void flush();
+    void flushStream();
 }
 
 /** 
@@ -57,8 +59,8 @@ class InputStreamWrapper(S, E = StreamType!S) : InputStream!E if (isInputStream!
         this.stream = &stream;
     }
 
-    int read(E[] buffer) {
-        return this.stream.read(buffer);
+    int readFromStream(E[] buffer) {
+        return this.stream.readFromStream(buffer);
     }
 }
 
@@ -83,8 +85,8 @@ class OutputStreamWrapper(S, E = StreamType!S) : OutputStream!E if (isOutputStre
         this.stream = &stream;
     }
 
-    int write(E[] buffer) {
-        return this.stream.write(buffer);
+    int writeToStream(E[] buffer) {
+        return this.stream.writeToStream(buffer);
     }
 }
 
@@ -105,20 +107,22 @@ unittest {
     auto sIn1 = arrayInputStreamFor!ubyte([1, 2, 3, 4]);
     auto wrapIn1 = new InputStreamWrapper!(typeof(sIn1))(sIn1);
     ubyte[] buffer1 = new ubyte[4];
-    assert(wrapIn1.read(buffer1) == 4);
+    assert(wrapIn1.readFromStream(buffer1) == 4);
     assert(buffer1 == [1, 2, 3, 4]);
     // Test using the function to make it easier.
     sIn1.reset();
     wrapIn1 = inputStreamWrapperFor(sIn1);
-    assert(wrapIn1.read(buffer1[0 .. 2]) == 2);
+    assert(wrapIn1.readFromStream(buffer1[0 .. 2]) == 2);
     assert(buffer1[0 .. 2] == [1, 2]);
 
     // Test output stream wrapper.
     auto sOut1 = byteArrayOutputStream();
     auto wrapOut1 = new OutputStreamWrapper!(typeof(sOut1))(sOut1);
-    assert(wrapOut1.write([1]) == 1);
+    assert(wrapOut1.writeToStream([1]) == 1);
     assert(sOut1.toArrayRaw() == [1]);
     wrapOut1 = outputStreamWrapperFor(sOut1);
-    assert(wrapOut1.write([2, 3, 4]) == 3);
+    assert(wrapOut1.writeToStream([2, 3, 4]) == 3);
     assert(sOut1.toArrayRaw() == [1, 2, 3, 4]);
+}
+
 }

@@ -5,27 +5,25 @@
 module streams.functions;
 
 import streams.primitives;
-
 import std.traits;
 
 version (D_BetterC) {} else {
     /**
      * Continously reads an input stream into an in-memory buffer, until 0 elements
      * could be read, or an error occurs.
+     * TODO: Use custom memory allocator!
      * Params:
      *   stream = The stream to read from.
-     *   bufferSize = The size of the internal buffer to use for reading.
      * Returns: The full contents of the stream.
      */
-    E[] readAll(S, E = StreamType!S)(
-        ref S stream,
-        uint bufferSize = 8192
+    E[] readAll(S, E = StreamType!S, uint BufferSize = 4096)(
+        ref S stream
     ) if (isInputStream!(S, E)) {
         import std.array : Appender, appender;
         Appender!(E[]) app = appender!(E[])();
-        E[] buffer = new E[bufferSize];
+        E[BufferSize] buffer;
         int itemsRead;
-        while ((itemsRead = stream.read(buffer)) > 0) {
+        while ((itemsRead = stream.readFromStream(buffer[])) > 0) {
             app ~= buffer[0 .. itemsRead];
         }
         return app[];
@@ -49,40 +47,38 @@ version (D_BetterC) {} else {
  * Params:
  *   input = The input stream to read from.
  *   output = The output stream to write to.
+ * Returns: The total number of items transferred, or -1 in case of error.
  */
-void transferTo(I, O, E = StreamType!I, uint BufferSize = 8192)(
+int transferTo(I, O, E = StreamType!I, uint BufferSize = 4096)(
     ref I input,
     ref O output
 ) if (isInputStream!(I, E) && isOutputStream!(O, E)) {
     E[BufferSize] buffer;
+    int totalItemsTransferred = 0;
     int itemsRead;
-    while ((itemsRead = input.read(buffer[])) > 0) {
-        int written = output.write(buffer[0 .. itemsRead]);
+    while ((itemsRead = input.readFromStream(buffer[])) > 0) {
+        int written = output.writeToStream(buffer[0 .. itemsRead]);
         if (written != itemsRead) {
-            throw new StreamException("Failed to transfer bytes.");
+            return -1;
         }
+        totalItemsTransferred += written;
     }
+    return totalItemsTransferred;
 }
 
 unittest {
     import streams;
-    import std.file;
 
     // Check that transferring does indeed work by transferring the LICENSE file to memory.
-    auto sIn = FileInputStream("LICENSE");
-    auto sOut = byteArrayOutputStream();
-    transferTo(sIn, sOut);
-    sIn.close();
-    assert(getSize("LICENSE") == sOut.toArrayRaw().length);
-    assert(cast(ubyte[]) readText("LICENSE") == sOut.toArrayRaw());
+    char[12] expected = "Hello world!";
+    auto sIn = arrayInputStreamFor!char(expected[]);
+    auto sOut = arrayOutputStreamFor!char();
+    assert(transferTo!(typeof(sIn), typeof(sOut), char, 4096)(sIn, sOut) == 12);
+    assert(sOut.toArrayRaw() == expected);
 
     // Check that a stream exception is thrown if transfer fails.
-    auto sIn2 = arrayInputStreamFor!ubyte([1, 2, 3]);
+    ubyte[3] data = [1, 2, 3];
+    auto sIn2 = arrayInputStreamFor!ubyte(data);
     auto sOut2 = ErrorOutputStream!ubyte();
-    try {
-        transferTo(sIn2, sOut2);
-        assert(false, "Expected StreamException to be thrown.");
-    } catch (StreamException e) {
-        // This is expected.
-    }
+    assert(transferTo(sIn2, sOut2) == -1);
 }

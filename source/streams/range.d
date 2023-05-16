@@ -7,6 +7,8 @@ module streams.range;
 import streams.primitives;
 import std.range;
 
+version (D_BetterC) {} else {
+
 /** 
  * A struct that, when initialized with an input stream, acts as a Phobos-style
  * input range for elements of the same type.
@@ -26,7 +28,7 @@ struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
 
     void popFront() {
         E[1] buffer;
-        this.lastRead = this.stream.read(buffer);
+        this.lastRead = this.stream.readFromStream(buffer);
         if (this.lastRead > 0) {
             this.lastElement = nullable(buffer[0]);
         } else {
@@ -88,7 +90,7 @@ unittest {
 struct InputRangeStream(R, E = ElementType!R) if (isInputRange!R) {
     private R range;
 
-    int read(E[] buffer) {
+    int readFromStream(E[] buffer) {
         int readCount = 0;
         while (readCount < buffer.length && !this.range.empty()) {
             E element = this.range.front();
@@ -113,16 +115,16 @@ unittest {
     int[] r = [1, 2, 3, 4, 5, 6];
     auto s = asInputStream(r);
     int[] buffer = new int[4];
-    assert(s.read(buffer) == 4);
+    assert(s.readFromStream(buffer) == 4);
     assert(buffer == [1, 2, 3, 4]);
 
     auto s2 = asInputStream("Hello world");
     dchar[] buffer2 = new dchar[4];
-    assert(s2.read(buffer2) == 4);
+    assert(s2.readFromStream(buffer2) == 4);
     assert(buffer2 == "Hell");
-    assert(s2.read(buffer2) == 4);
+    assert(s2.readFromStream(buffer2) == 4);
     assert(buffer2 == "o wo");
-    assert(s2.read(buffer2) == 3);
+    assert(s2.readFromStream(buffer2) == 3);
     assert(buffer2 == "rldo");
 }
 
@@ -134,7 +136,7 @@ struct OutputStreamRange(S, E = StreamType!S) if (isOutputStream!(S, E)) {
     private S* stream;
     
     void put(E[] buffer) {
-        this.stream.write(buffer);
+        this.stream.writeToStream(buffer);
     }
 }
 
@@ -177,7 +179,7 @@ unittest {
 struct OutputRangeStream(R, E = ElementType!R) if (isOutputRange!(R, E)) {
     private R range;
 
-    int write(E[] buffer) {
+    int writeToStream(E[] buffer) {
         this.range.put(buffer);
         return cast(int) buffer.length;
     }
@@ -196,9 +198,9 @@ auto asOutputStream(R, E = ElementType!R)(R range) if (isOutputRange!(R, E)) {
 unittest {
     ubyte[] r = new ubyte[8192];
     auto s = asOutputStream(r);
-    assert(s.write([1, 2, 3]) == 3);
+    assert(s.writeToStream([1, 2, 3]) == 3);
     assert(r[0 .. 3] == [1, 2, 3]);
-    assert(s.write([4, 5]) == 2);
+    assert(s.writeToStream([4, 5]) == 2);
     assert(r[0 .. 5] == [1, 2, 3, 4, 5]);
 }
 
@@ -265,4 +267,6 @@ unittest {
     auto outputStream = byteArrayOutputStream();
     auto outputRange = asRange(outputStream);
     assert(isOutputRange!(typeof(outputRange), ubyte));
+}
+
 }

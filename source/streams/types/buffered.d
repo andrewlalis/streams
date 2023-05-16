@@ -18,10 +18,10 @@ struct BufferedInputStream(S, E = StreamType!S) if (isInputStream!(S, E)) {
         this.stream = &stream;
     }
 
-    int read(E[] buffer) {
+    int readFromStream(E[] buffer) {
         uint bufferIndex = 0;
         while (bufferIndex < buffer.length) {
-            int elementsRead = this.stream.read(buffer[bufferIndex .. $]);
+            int elementsRead = this.stream.readFromStream(buffer[bufferIndex .. $]);
             if (elementsRead == 0) {
                 return bufferIndex; // Return the total number of elements we read so far.
             } else if (elementsRead == -1) {
@@ -34,16 +34,15 @@ struct BufferedInputStream(S, E = StreamType!S) if (isInputStream!(S, E)) {
 }
 
 unittest {
-    import streams;
-    import core.thread;
+    import streams.types.array : arrayInputStreamFor;
 
     auto sIn1 = arrayInputStreamFor!int([1, 2, 3, 4]);
     auto bufIn1 = BufferedInputStream!(typeof(sIn1), int)(sIn1);
     int[1] buf1;
-    assert(bufIn1.read(buf1[]) == 1);
+    assert(bufIn1.readFromStream(buf1[]) == 1);
     assert(buf1 == [1]);
     int[4] buf2;
-    assert(bufIn1.read(buf2[]) == 3);
+    assert(bufIn1.readFromStream(buf2[]) == 3);
 
 }
 
@@ -56,7 +55,7 @@ struct BufferedOutputStream(S, E = StreamType!E, uint BufferSize = DEFAULT_BUFFE
         this.stream = &stream;
     }
 
-    int write(E[] buffer) {
+    int writeToStream(E[] buffer) {
         int elementsWritten = 0;
         uint bufferIndex = 0;
         while (bufferIndex < buffer.length) {
@@ -84,34 +83,34 @@ struct BufferedOutputStream(S, E = StreamType!E, uint BufferSize = DEFAULT_BUFFE
     }
 
     private int internalFlush() {
-        int result = this.stream.write(this.internalBuffer[0 .. this.nextIndex]);
+        int result = this.stream.writeToStream(this.internalBuffer[0 .. this.nextIndex]);
         if (result != -1) {
             this.nextIndex = 0;
         }
         return result;
     }
 
-    void flush() {
+    void flushStream() {
         this.internalFlush();
     }
 }
 
 unittest {
-    import streams;
+    import streams.types.array : byteArrayOutputStream;
     auto sOut1 = byteArrayOutputStream();
     auto bufOut1 = BufferedOutputStream!(typeof(sOut1), ubyte, 4)(sOut1);
 
     assert(isOutputStream!(typeof(bufOut1), ubyte));
     assert(isFlushableStream!(typeof(bufOut1)));
 
-    assert(bufOut1.write([1]) == 1);
+    assert(bufOut1.writeToStream([1]) == 1);
     assert(sOut1.toArrayRaw().length == 0);
-    assert(bufOut1.write([2]) == 1);
+    assert(bufOut1.writeToStream([2]) == 1);
     assert(sOut1.toArrayRaw().length == 0);
-    assert(bufOut1.write([3, 4]) == 2);
+    assert(bufOut1.writeToStream([3, 4]) == 2);
     assert(sOut1.toArrayRaw() == [1, 2, 3, 4]);
-    assert(bufOut1.write([5]) == 1);
+    assert(bufOut1.writeToStream([5]) == 1);
     assert(sOut1.toArrayRaw().length == 4);
-    bufOut1.flush();
+    bufOut1.flushStream();
     assert(sOut1.toArrayRaw() == [1, 2, 3, 4, 5]);
 }

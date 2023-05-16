@@ -6,8 +6,8 @@ module streams.types.array;
 /** 
  * An input stream that reads from an array of items.
  */
-struct ArrayInputStream(DataType) {
-    private DataType[] array;
+struct ArrayInputStream(E) {
+    private E[] array;
     private uint currentIndex = 0;
 
     /** 
@@ -19,7 +19,7 @@ struct ArrayInputStream(DataType) {
      *   buffer = The buffer read array elements into.
      * Returns: The number of elements that were read.
      */
-    int read(DataType[] buffer) {
+    int readFromStream(E[] buffer) {
         if (this.currentIndex >= this.array.length) return 0;
         uint bufferLength = cast(uint) buffer.length;
         uint lengthRemaining = cast(uint) this.array.length - this.currentIndex;
@@ -44,17 +44,18 @@ unittest {
     assert(isSomeInputStream!(ArrayInputStream!int));
     assert(isInputStream!(ArrayInputStream!ubyte, ubyte));
 
-    auto s1 = ArrayInputStream!int([1, 2, 3, 4, 5]);
-    int[] buffer = new int[2];
-    assert(s1.read(buffer) == 2);
+    int[5] data = [1, 2, 3, 4, 5];
+    auto s1 = ArrayInputStream!int(data);
+    int[2] buffer;
+    assert(s1.readFromStream(buffer) == 2);
     assert(buffer == [1, 2]);
-    assert(s1.read(buffer) == 2);
+    assert(s1.readFromStream(buffer) == 2);
     assert(buffer == [3, 4]);
-    assert(s1.read(buffer) == 1);
+    assert(s1.readFromStream(buffer) == 1);
     assert(buffer == [5, 4]);
 
     s1.reset();
-    assert(s1.read(buffer) == 2);
+    assert(s1.readFromStream(buffer) == 2);
     assert(buffer == [1, 2]);
 }
 
@@ -65,9 +66,12 @@ unittest {
  *   array = The array to stream.
  * Returns: The array input stream.
  */
-ArrayInputStream!T arrayInputStreamFor(T)(T[] array) {
-    return ArrayInputStream!T(array);
+ArrayInputStream!E arrayInputStreamFor(E)(E[] array) {
+    return ArrayInputStream!E(array);
 }
+
+enum AllocationStrategy { Linear, Doubling, None }
+const uint DEFAULT_INITIAL_CAPACITY = 64;
 
 /** 
  * An output stream that writes to an internal array. The resulting array can
@@ -79,13 +83,10 @@ ArrayInputStream!T arrayInputStreamFor(T)(T[] array) {
  * strategy. If the `None` strategy is used, attempts to write more elements
  * than the array contains will throw an unrecoverable Error.
  */
-struct ArrayOutputStream(DataType) {
+struct ArrayOutputStream(E) {
     import core.stdc.stdlib : malloc, realloc, free;
-
-    static enum AllocationStrategy { Linear, Doubling, None }
-    static const uint DEFAULT_INITIAL_CAPACITY = 64;
     
-    private DataType* arrayPtr;
+    private E* arrayPtr;
     const AllocationStrategy allocationStrategy;
     const uint initialArrayCapacity;
     private uint arrayCapacity;
@@ -103,9 +104,9 @@ struct ArrayOutputStream(DataType) {
      *                        stream's array reaches capacity.
      */
     this(uint initialCapacity, AllocationStrategy allocationStrategy) {
-        this.arrayPtr = cast(DataType*) malloc(initialCapacity * DataType.sizeof);
+        this.arrayPtr = cast(E*) malloc(initialCapacity * E.sizeof);
         if (this.arrayPtr is null) {
-            throw new Error("Failed to allocate memory for array."); // cov-ignore
+            assert(false, "Failed to allocate memory for array."); // cov-ignore
         }
         this.allocationStrategy = allocationStrategy;
         this.initialArrayCapacity = initialCapacity;
@@ -124,10 +125,10 @@ struct ArrayOutputStream(DataType) {
      * Returns: The number of elements that were written. Barring memory
      * issues, this will always equal the buffer's length.
      */
-    int write(DataType[] buffer) {
+    int writeToStream(E[] buffer) {
         uint len = cast(uint) buffer.length;
         this.ensureCapacityFor(len);
-        DataType[] array = this.arrayPtr[0 .. this.arrayCapacity];
+        E[] array = this.arrayPtr[0 .. this.arrayCapacity];
         array[this.nextArrayIndex .. this.nextArrayIndex + len] = buffer[0 .. $];
         this.nextArrayIndex += len;
         return len;
@@ -144,12 +145,12 @@ struct ArrayOutputStream(DataType) {
                     newArrayCapacity = this.arrayCapacity * 2;
                     break;
                 case AllocationStrategy.None: // cov-ignore
-                    throw new Error("Not enough capacity to add more items to ArrayOutputStream."); // cov-ignore
+                    assert(false, "Not enough capacity to add more items to ArrayOutputStream."); // cov-ignore
             }
-            DataType* newPtr = cast(DataType*) realloc(this.arrayPtr, newArrayCapacity * DataType.sizeof);
+            E* newPtr = cast(E*) realloc(this.arrayPtr, newArrayCapacity * E.sizeof);
             if (newPtr is null) {
                 free(this.arrayPtr); // cov-ignore
-                throw new Error("Could not reallocate memory."); // cov-ignore
+                assert(false, "Could not reallocate memory."); // cov-ignore
             }
             this.arrayPtr = newPtr;
             this.arrayCapacity = newArrayCapacity;
@@ -162,8 +163,8 @@ struct ArrayOutputStream(DataType) {
          * method is not compatible with BetterC mode; use `toArrayRaw` for that.
          * Returns: The internal array.
          */
-        DataType[] toArray() const {
-            DataType[] array = new DataType[this.nextArrayIndex];
+        E[] toArray() const {
+            E[] array = new E[this.nextArrayIndex];
             array[0 .. $] = this.arrayPtr[0 .. this.nextArrayIndex];
             return array;
         }
@@ -180,7 +181,7 @@ struct ArrayOutputStream(DataType) {
      * Returns: A slice representing the array of elements that have been added
      * to this stream.
      */
-    DataType[] toArrayRaw() {
+    E[] toArrayRaw() {
         return this.arrayPtr[0 .. this.nextArrayIndex];
     }
 
@@ -192,9 +193,9 @@ struct ArrayOutputStream(DataType) {
         if (this.arrayPtr !is null) {
             free(this.arrayPtr);
         }
-        this.arrayPtr = cast(DataType*) malloc(this.initialArrayCapacity * DataType.sizeof);
+        this.arrayPtr = cast(E*) malloc(this.initialArrayCapacity * E.sizeof);
         if (this.arrayPtr is null) {
-            throw new Error("Failed to allocate memory for array."); // cov-ignore
+            assert(false, "Failed to allocate memory for array."); // cov-ignore
         }
         this.arrayCapacity = this.initialArrayCapacity;
         this.nextArrayIndex = 0;
@@ -207,11 +208,8 @@ struct ArrayOutputStream(DataType) {
  * and default allocation strategy of `AllocationStrategy.Doubling`.
  * Returns: The array output stream.
  */
-ArrayOutputStream!T arrayOutputStreamFor(T)() {
-    return ArrayOutputStream!T(
-        ArrayOutputStream!T.DEFAULT_INITIAL_CAPACITY,
-        ArrayOutputStream!T.AllocationStrategy.Doubling
-    );
+ArrayOutputStream!E arrayOutputStreamFor(E)() {
+    return ArrayOutputStream!E(DEFAULT_INITIAL_CAPACITY, AllocationStrategy.Doubling);
 }
 
 /** 
@@ -224,45 +222,47 @@ ArrayOutputStream!ubyte byteArrayOutputStream() {
 
 unittest {
     import streams.primitives;
-    import std.stdio;
 
     assert(isSomeOutputStream!(ArrayOutputStream!bool));
 
     auto s1 = arrayOutputStreamFor!float;
-    float[] buffer = [0.5, 1, 1.5];
-    assert(s1.write(buffer) == 3);
+    float[3] buffer = [0.5, 1, 1.5];
+    assert(s1.writeToStream(buffer) == 3);
     buffer = [2, 2.5, 3];
-    assert(s1.write(buffer) == 3);
-    assert(s1.toArray() == [0.5, 1, 1.5, 2, 2.5, 3]);
+    assert(s1.writeToStream(buffer) == 3);
+    assert(s1.toArrayRaw() == [0.5, 1, 1.5, 2, 2.5, 3]);
     assert(s1.toArrayRaw() == [0.5, 1, 1.5, 2, 2.5, 3]);
 
     auto s2 = byteArrayOutputStream();
-    ubyte[] buffer1 = [1, 2, 3];
-    s2.write(buffer1);
-    ubyte[] data = s2.toArray();
+    ubyte[3] buffer1 = [1, 2, 3];
+    s2.writeToStream(buffer1);
+    ubyte[] data = s2.toArrayRaw();
     assert(data == [1, 2, 3]);
 
     s2.reset();
-    assert(s2.toArray().length == 0);
-    s2.write(buffer1);
-    assert(s2.toArray() == [1, 2, 3]);
+    assert(s2.toArrayRaw().length == 0);
+    s2.writeToStream(buffer1);
+    assert(s2.toArrayRaw() == [1, 2, 3]);
 
     // Test that capacity increasing works for various allocation strategies.
-    auto s3 = ArrayOutputStream!int(2, ArrayOutputStream!int.AllocationStrategy.Linear);
+    auto s3 = ArrayOutputStream!int(2, AllocationStrategy.Linear);
     assert(s3.capacity == 2);
-    assert(s3.allocationStrategy == ArrayOutputStream!int.AllocationStrategy.Linear);
-    assert(s3.write([1, 2]) == 2);
+    assert(s3.allocationStrategy == AllocationStrategy.Linear);
+    int[3] data2 = [1, 2, 3];
+    assert(s3.writeToStream(data2[0 .. 2]) == 2);
     assert(s3.capacity == 2);
-    assert(s3.write([3]) == 1);
+    assert(s3.writeToStream(data2[2 .. 3]) == 1);
     assert(s3.capacity == 4); // Check that the capacity grew linearly by a multiple of the original capacity.
-    assert(s3.write([4, 5, 6]) == 3);
+    data2 = [4, 5, 6];
+    assert(s3.writeToStream(data2) == 3);
     assert(s3.capacity == 6);
 
-    auto s4 = ArrayOutputStream!int(2, ArrayOutputStream!int.AllocationStrategy.Doubling);
-    assert(s4.write([1, 2]) == 2);
+    auto s4 = ArrayOutputStream!int(2, AllocationStrategy.Doubling);
+    int[6] data4 = [1, 2, 3, 4, 5, 6];
+    assert(s4.writeToStream(data4[0 .. 2]) == 2);
     assert(s4.capacity == 2);
-    assert(s4.write([3, 4]) == 2);
+    assert(s4.writeToStream(data4[2 .. 4]) == 2);
     assert(s4.capacity == 4);
-    assert(s4.write([5, 6]) == 2);
+    assert(s4.writeToStream(data4[4 .. 6]) == 2);
     assert(s4.capacity == 8);
 }

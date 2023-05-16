@@ -5,9 +5,13 @@
 module streams.types.file;
 
 import std.stdio : File;
+import core.stdc.stdio;
+
+version (D_BetterC) {} else {
 
 /** 
- * A byte input stream that reads from a file.
+ * A byte input stream that reads from a file. Makes use of the underlying
+ * `fopen` and related C functions.
  */
 struct FileInputStream {
     private File file;
@@ -20,12 +24,12 @@ struct FileInputStream {
         this(File(filename, "rb"));
     }
 
-    int read(ubyte[] buffer) {
+    int readFromStream(ubyte[] buffer) {
         ubyte[] slice = this.file.rawRead(buffer);
         return cast(int) slice.length;
     }
 
-    void close() {
+    void closeStream() {
         if (this.file.isOpen()) {
             this.file.close();
         }
@@ -53,16 +57,16 @@ struct FileOutputStream {
         this(File(filename, "wb"));
     }
 
-    int write(ubyte[] buffer) {
+    int writeToStream(ubyte[] buffer) {
         this.file.rawWrite(buffer);
         return cast(int) buffer.length;
     }
 
-    void flush() {
+    void flushStream() {
         this.file.flush();
     }
 
-    void close() {
+    void closeStream() {
         if (this.file.isOpen()) {
             this.file.close();
         }
@@ -82,11 +86,11 @@ unittest {
     const FILENAME = "test-file-flush";
     File f1 = File(FILENAME, "wb");
     auto sOut = FileOutputStream(f1);
-    sOut.flush();
+    sOut.flushStream();
     assert(getSize(FILENAME) == 0);
     auto dOut = dataOutputStreamFor(sOut);
-    dOut.write!(char[5])("Hello");
-    sOut.flush();
+    dOut.writeToStream!(char[5])("Hello");
+    sOut.flushStream();
     assert(readText(FILENAME) == "Hello");
     f1.close();
     try {
@@ -94,4 +98,6 @@ unittest {
     } catch (FileException e) {
         stderr.writefln!"Failed to delete file %s: %s"(FILENAME, e.msg); // cov-ignore
     }
+}
+
 }

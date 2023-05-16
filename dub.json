@@ -5,5 +5,16 @@
 	"copyright": "Copyright © 2023, Andrew Lalis",
 	"description": "A collection of useful stream primitives and implementations.",
 	"license": "MIT",
-	"name": "streams"
+	"name": "streams",
+	"configurations": [
+		{
+			"name": "standard",
+			"targetType": "library"
+		},
+		{
+			"name": "betterC",
+			"targetType": "library",
+			"buildOptions": ["betterC", "verbose"]
+		}
+	]
 }
