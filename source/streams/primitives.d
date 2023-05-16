@@ -4,16 +4,14 @@
  *
  * Streams come in two main flavors: ${B input} and ${B output} streams.
  * 
- * ${B Input streams} are defined by the presence of a `read` function with the
- * following signature:
+ * ${B Input streams} are defined by the presence of a read function:
  * ```d
- * int read(DataType[] buffer)
+ * int readFromStream(DataType[] buffer)
  * ```
  *
- * ${B Output streams} are defined by the presence of a `write` function with
- * the following signature:
+ * ${B Output streams} are defined by the presence of a write function:
  * ```d
- * int read(DataType[] buffer)
+ * int writeToStream(DataType[] buffer)
  * ```
  *
  * Usually these functions can be used as [Template Constraints](https://dlang.org/spec/template.html#template_constraints)
@@ -21,7 +19,7 @@
  * ```d
  * void useBytes(S)(S stream) if (isInputStream!(S, ubyte)) {
  *     ubyte[] buffer = new ubyte[8192];
- *     int bytesRead = stream.read(buffer);
+ *     int bytesRead = stream.readFromStream(buffer);
  *     // Do something with the data.
  * }
  * ```
@@ -36,17 +34,9 @@ private const OUTPUT_STREAM_METHOD = "writeToStream";
 private const FLUSHABLE_STREAM_METHOD = "flushStream";
 private const CLOSABLE_STREAM_METHOD = "closeStream";
 
-version (D_BetterC) {
-    extern (C) void main() {
-        static foreach(u; __traits(getUnitTests, __traits(parent, main))) {
-            u();
-        }
-    }
-}
-
 /** 
  * Determines if the given template argument is some form of input stream,
- * where an input stream is anything with a `read` method that takes a single
+ * where an input stream is anything with a read method that takes a single
  * array parameter, and returns an integer number of elements that were read,
  * or -1 in case of error. This method does not care about the type of elements
  * that can be read by the stream.

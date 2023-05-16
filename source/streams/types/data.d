@@ -174,7 +174,8 @@ struct DataInputStream(S) if (isByteInputStream!S) {
          */
         T readFromStreamOrThrow(T)() {
             DataReadResult!T result = this.readFromStream!T();
-            if (!result.error.present) {
+            if (result.error.present) {
+                import streams.primitives : StreamException;
                 throw new StreamException(cast(string) result.error.value.message);
             }
             return result.value.value;
@@ -360,6 +361,8 @@ unittest {
     assert(sOut1.toArrayRaw() == buffer2);
 
     version (D_BetterC) {} else {
+        import streams.primitives : StreamException;
+
         // Test that calling readOrThrow throws an exception with invalid data.
         auto sIn2 = arrayInputStreamFor!ubyte([1, 2, 3]);
         auto dataIn2 = dataInputStreamFor(sIn2);

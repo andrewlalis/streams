@@ -18,6 +18,7 @@ streams-test-standard
 streams-test-betterC
 libstreams.a
 .DS_Store
+primitives
 
 adrdox/
 skeleton.html
