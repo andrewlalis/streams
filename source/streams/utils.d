@@ -8,8 +8,8 @@ module streams.utils;
  * present.
  */
 struct Optional(T) {
-    const bool present = false;
-    const T value = T.init;
+    bool present = false;
+    T value = T.init;
 
     this(T value) {
         this.present = true;
@@ -61,6 +61,12 @@ unittest {
     auto e1 = Either!(int, bool)(5);
     assert(e1.first.present);
     assert(e1.second.notPresent);
+    assert(e1.first.value == 5);
+
+    auto e2 = Either!(float, ubyte)(3u);
+    assert(e2.first.notPresent);
+    assert(e2.second.present);
+    assert(e2.second.value == 3);
 }
 
 /** 
@@ -175,7 +181,7 @@ struct AppendableBuffer(T) {
             }
             T* newPtr = cast(T*) realloc(this.ptr, newCapacity * T.sizeof);
             if (newPtr is null) {
-                free(this.ptr);
+                free(this.ptr); // Can't test this without mocking realloc... cov-ignore
                 assert(false, "Could not reallocate appendable buffer.");
             }
             this.ptr = newPtr;
@@ -200,4 +206,14 @@ unittest {
     assert(copy.length == 6);
     import core.stdc.stdlib : free;
     free(copy.ptr);
+
+    // Test a linear buffer allocation strategy.
+    auto ab2 = AppendableBuffer!int(4, BufferAllocationStrategy.Linear);
+    assert(ab2.length() == 0);
+    for (uint i = 0; i < 10; i++) {
+        int[1] buf2 = [i];
+        ab2.appendItems(buf2);
+    }
+    assert(ab2.length() == 10);
+    assert(ab2.toArray() == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 }

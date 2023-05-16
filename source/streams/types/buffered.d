@@ -59,6 +59,12 @@ unittest {
     int[4] buf2;
     assert(bufIn1.readFromStream(buf2[]) == 3);
 
+    // Check that a read error propagates.
+    import streams.primitives : ErrorInputStream;
+    auto sIn3 = ErrorInputStream!int();
+    auto bufIn3 = BufferedInputStream!(typeof(sIn3), int)(sIn3);
+    int[64] buf3;
+    assert(bufIn3.readFromStream(buf3) == -1);
 }
 
 /** 

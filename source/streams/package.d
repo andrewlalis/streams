@@ -9,6 +9,7 @@ public import streams.primitives;
 public import streams.functions;
 public import streams.types;
 public import streams.interfaces;
+public import streams.range;
 public import streams.utils;
 
 // Custom unittest runner for BetterC mode.
@@ -18,6 +19,7 @@ version (D_BetterC) {
         runTests!(streams.utils);
         runTests!(streams.functions);
         runTests!(streams.interfaces);
+        runTests!(streams.range);
         runTests!(streams.types.array);
         runTests!(streams.types.buffered);
         runTests!(streams.types.data);

@@ -136,7 +136,9 @@ struct DataInputStream(S) if (isByteInputStream!S) {
     }
 
     /** 
-     * Reads a value from the stream.
+     * Reads a value from the stream and returns either the value that was
+     * read successfully, or an error message. If you want to ignore errors,
+     * you can use `readFromStreamOrDefault` instead.
      * Returns: A result containing either that value that was read, or an error.
      */
     DataReadResult!T readFromStream(T)() {
@@ -363,6 +365,13 @@ unittest {
     version (D_BetterC) {} else {
         import streams.primitives : StreamException;
 
+        // Test that calling readOrThrow with valid data returns the data.
+        auto sIn2_ = arrayInputStreamFor!ubyte([1, 2, 3]);
+        auto dataIn2_ = dataInputStreamFor(sIn2_);
+        assert(dataIn2_.readFromStreamOrThrow!ubyte() == 1);
+        assert(dataIn2_.readFromStreamOrThrow!ubyte() == 2);
+        assert(dataIn2_.readFromStreamOrThrow!ubyte() == 3);
+
         // Test that calling readOrThrow throws an exception with invalid data.
         auto sIn2 = arrayInputStreamFor!ubyte([1, 2, 3]);
         auto dataIn2 = dataInputStreamFor(sIn2);
@@ -403,4 +412,13 @@ unittest {
     auto dataOut7 = dataOutputStreamFor(sOut6, Endianness.LittleEndian);
     dataOut7.writeToStream!short(1);
     assert(sOut6.toArrayRaw() == [1, 0]);
+
+    // Test that readOrDefault works.
+    ubyte[4] data7 = [1, 2, 3, 4];
+    auto sIn7 = arrayInputStreamFor(data7);
+    auto dataIn7 = dataInputStreamFor(sIn7);
+    for (uint i = 0; i < 4; i++) {
+        assert(dataIn7.readFromStreamOrDefault!ubyte() == data7[i]);
+    }
+    assert(dataIn7.readFromStreamOrDefault!ubyte(42) == 42);
 }

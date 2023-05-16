@@ -18,7 +18,7 @@
  * when defining your own functions and symbols to work with streams.
  * ```d
  * void useBytes(S)(S stream) if (isInputStream!(S, ubyte)) {
- *     ubyte[] buffer = new ubyte[8192];
+ *     ubyte[8192] buffer;
  *     int bytesRead = stream.readFromStream(buffer);
  *     // Do something with the data.
  * }
@@ -300,8 +300,8 @@ bool isByteOutputStream(StreamType)() {
 
 /** 
  * Determines if the given template argument is a closable stream type, which
- * defines a `void close()` method as a means to close and/or deallocate the
- * underlying resource that the stream reads from or writes to.
+ * defines a `void closeStream()` method as a means to close and/or deallocate
+ * the underlying resource that the stream reads from or writes to.
  *
  * Returns: `true` if the given argument is a closable stream.
  */
@@ -339,7 +339,7 @@ unittest {
 
 /** 
  * Determines if the given template argument is a flushable stream type, which
- * is any output stream that defines a `void flush()` method, which should
+ * is any output stream that defines a `void flushStream()` method, which should
  * cause any data buffered by the stream or its resources to be flushed. The
  * exact nature of how a flush operates is implementation-dependent.
  *
@@ -383,6 +383,8 @@ version (D_BetterC) {} else {
      * while working with streams. Generally, if an exception is to be thrown while
      * reading or writing in a stream's implementation, a `StreamException` should
      * be wrapped around it to provide a common interface for error handling.
+     *
+     * This is not available in BetterC mode.
      */
     class StreamException : Exception {
         import std.exception;

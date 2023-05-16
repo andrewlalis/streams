@@ -174,4 +174,9 @@ unittest {
     assert(s2.toArrayRaw().length == 0);
     s2.writeToStream(buffer1);
     assert(s2.toArrayRaw() == [1, 2, 3]);
+
+    version (D_BetterC) {} else {
+        // Test the dynamic toArray method.
+        assert(s2.toArray() == [1, 2, 3]);
+    }
 }

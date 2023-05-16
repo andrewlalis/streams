@@ -7,7 +7,10 @@
 A collection of useful stream primitives and implementations. Designed to be a
 candidate for inclusion in Phobos. The concept of a stream is of a component
 that implements a `int read(T[] buffer)` or `int write(T[] buffer)` method for
-some element type `T`.
+some element type `T`. This library has been designed to be *BetterC*
+compatible, using manual memory management anywhere that's needed. Some
+features are only available in conjunction with the D runtime though, like
+exceptions and stream implementations for Phobos-specific components.
 
 Similar to [Phobos' ranges](https://dlang.org/phobos/std_range.html), streams
 are defined and type-checked using a _primitives_ package that contains various
@@ -20,14 +23,9 @@ import streams;
 void sayHello(Socket socket) {
     auto outputStream = SocketOutputStream(socket);
     auto dataOutput = dataOutputStreamFor(outputStream);
-    dataOutput.write!(char[5])("Hello");
+    dataOutput.writeToStream!(char[5])("Hello");
 }
 ```
-
-Stream primitives are generally compatible with [BetterC](https://dlang.org/spec/betterc.html),
-although there may be incompatibilities in various implementations where
-dynamic arrays or exceptions are used. You may certainly write streams that are
-safe, no-gc compatible, pure, and so on.
 
 ## Features
 
@@ -77,6 +75,8 @@ streams that implement both input and output functions.
 
 Simply clone this repository, and ensure you have a recent version of D with
 any compiler, and run `dub test` to test the library.
+
+For testing the library's *BetterC* compatibility, run `dub test --config=betterC`.
 
 Documentation can be generated with `./gen_docs.d`, which internally uses
 Adrdox to generate documentation at `generated-docs/`.
