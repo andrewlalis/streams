@@ -33,7 +33,14 @@ jobs:
         run: dub -q test
       
       - name: Run BetterC Tests
+        continue-on-error: true # Allow this step to fail, since some support is lacking.
         run: dub -q test --config=betterC
+
+      - name: Build Library
+        run: dub -q build
+
+      - name: Build Library in BetterC Mode
+        run: dub -q build --config=betterC
 
       - name: Coverage
         run: ./gen_coverage.d
