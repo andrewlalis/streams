@@ -33,6 +33,7 @@ private const INPUT_STREAM_METHOD = "readFromStream";
 private const OUTPUT_STREAM_METHOD = "writeToStream";
 private const FLUSHABLE_STREAM_METHOD = "flushStream";
 private const CLOSABLE_STREAM_METHOD = "closeStream";
+private const SEEKABLE_STREAM_METHOD = "seekInStream";
 
 /** 
  * Determines if the given template argument is some form of input stream,
@@ -375,6 +376,27 @@ unittest {
     assert(!isFlushableStream!S2);
     struct S3 {}
     assert(!isFlushableStream!S3);
+}
+
+/** 
+ * Determines if the given template argument is a seekable stream type, which
+ * is any stream, input or output, that defines a `seekInStream()` method that
+ * causes the stream to seek to a particular location in the underlying
+ * resource so that the next stream operation takes place from that location.
+ * Returns: `true` if the given argument is a seekable stream.
+ */
+bool isSeekableStream(S)() {
+    static if (
+        isSomeStream!S &&
+        __traits(hasMember, S, SEEKABLE_STREAM_METHOD) &&
+        isCallable!(__traits(getMember, S, SEEKABLE_STREAM_METHOD))
+    ) {
+        alias seekFunction = __traits(getMember, S, SEEKABLE_STREAM_METHOD);
+        alias params = Parameters!seekFunction;
+        return (is(ReturnType!seekFunction == void) && params.length == 0);
+    } else {
+        return false;
+    }
 }
 
 version (D_BetterC) {} else {
