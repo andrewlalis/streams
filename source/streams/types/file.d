@@ -1,6 +1,6 @@
 /** 
- * Defines input and output streams for reading and writing files, using
- * `std.stdio.File` as the underlying resource.
+ * Defines input and output streams for reading and writing files using C's
+ * stdio functions as a basis.
  */
 module streams.types.file;
 
