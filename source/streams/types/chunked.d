@@ -54,17 +54,16 @@ private uint writeHexString(uint value, char[] buffer) {
 unittest {
     char[10] buffer;
     assert(writeHexString(4, buffer) == 1);
-    assert(buffer[0] == '4');
+    assert(buffer[0] == '4', cast(string) buffer[0 .. 1]);
     
     assert(writeHexString(42, buffer) == 2);
-    assert(buffer[0] == '2');
-    assert(buffer[1] == 'A');
+    assert(buffer[0 .. 2] == cast(char[2]) "2A", cast(string) buffer[0 .. 2]);
 
     assert(writeHexString(0, buffer) == 1);
-    assert(buffer[0] == '0');
+    assert(buffer[0] == '0', cast(string) buffer[0 .. 1]);
 
     assert(writeHexString(4_684_234, buffer) == 6);
-    assert(buffer[0 .. 6] == cast(char[6]) "4779CA");
+    assert(buffer[0 .. 6] == cast(char[6]) "4779CA", cast(string) buffer[0 .. 6]);
 }
 
 struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
