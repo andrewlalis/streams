@@ -33,40 +33,67 @@ unittest {
 /** 
  * A type that contains either an element of A, or an element of B, but not both.
  */
-struct Either(A, B) if (!is(A == B)) {
-    const Optional!A first;
-    const Optional!B second;
+struct Either(A, string NameA, B, string NameB) if (!is(A == B)) {
+    union U {
+        A a;
+        B b;
+    }
+    private const bool hasA;
+    private const U u;
 
     this(A value) {
-        this.first = Optional!A(value);
-        this.second = Optional!B.init;
+        this.u = value;
+        this.hasA = true;
     }
 
     this(B value) {
-        this.second = Optional!B(value);
-        this.first = Optional!A.init;
+        this.u = value;
+        this.hasA = false;
     }
 
-    invariant {
-        assert((first.present || second.present) && !(first.present && second.present));
+    A opDispatch(string member)() const if (member == NameA) {
+        return this.u.a;
     }
 
-    T map(T)(T delegate(A) dgA, T delegate(B) dgB) {
-        if (first.present) return dgA(first.value);
-        return dgB(second.value);
+    B opDispatch(string member)() const if (member == NameB) {
+        return this.u.b;
+    }
+
+    bool opDispatch(string member)() const if (member.length > 3 && member[0 .. 3] == "has") {
+        const string suffix = member[3 .. $];
+        static if (suffix == NameA) {
+            return this.hasA;
+        } else static if (suffix == NameB) {
+            return !this.hasA;
+        } else {
+            assert(false, "Invalid member. Expected \"has");
+        }
+    }
+
+    bool has(string member)() const if (member == NameA || member == NameB) {
+        static if (member == NameA) {
+            return this.hasA;
+        } else {
+            return !this.hasA;
+        }
+    }
+
+    T map(T)(T delegate(A) dgA, T delegate(B) dgB) const {
+        if (this.hasA) return dgA(this.u.a);
+        return dgB(this.u.b);
     }
 }
 
 unittest {
-    auto e1 = Either!(int, bool)(5);
-    assert(e1.first.present);
-    assert(e1.second.notPresent);
-    assert(e1.first.value == 5);
+    auto e1 = Either!(int, "first", bool, "second")(5);
+    assert(e1.hasFirst);
+    assert(!e1.hasSecond);
+    assert(e1.first == 5);
 
-    auto e2 = Either!(float, ubyte)(3u);
-    assert(e2.first.notPresent);
-    assert(e2.second.present);
-    assert(e2.second.value == 3);
+    auto e2 = Either!(float, "first", ubyte, "second")(3u);
+    assert(!e2.hasFirst);
+    assert(e2.hasSecond);
+    assert(e2.second == 3);
 }
 
 /** 
