@@ -230,3 +230,78 @@ void reverseArray(T)(T[] array) {
         array[array.length - i - 1] = tmp;
     }
 }
+
+/** 
+ * Reads an unsigned integer value from a hex-string.
+ * Params:
+ *   chars = The characters to read from.
+ * Returns: An optional unsigned integer.
+ */
+Optional!uint readHexString(const(char[]) chars) {
+    uint value = 0;
+    foreach (c; chars) {
+        ubyte b;
+        if (c >= '0' && c <= '9') {
+            b = cast(ubyte) (c - '0');
+        } else if (c >= 'a' && c <= 'f') {
+            b = cast(ubyte) (c - 'a' + 10);
+        } else if (c >= 'A' && c <= 'F') {
+            b = cast(ubyte) (c - 'A' + 10);
+        } else {
+            return Optional!uint.init;
+        }
+        value = (value << 4) | (b & 0xF);
+    }
+    return Optional!uint(value);
+}
+
+unittest {
+    char[10] buffer;
+    buffer[0] = '4';
+    assert(readHexString(buffer[0 .. 1]) == Optional!uint(4));
+    buffer[0 .. 2] = cast(char[2]) "2A";
+    assert(readHexString(buffer[0 .. 2]) == Optional!uint(42));
+    buffer[0 .. 4] = cast(char[4]) "bleh";
+    assert(readHexString(buffer[0 .. 4]) == Optional!uint.init);
+    buffer[0 .. 6] = cast(char[6]) "4779CA";
+    assert(readHexString(buffer[0 .. 6]) == Optional!uint(4_684_234));
+    buffer[0] = '0';
+    assert(readHexString(buffer[0 .. 1]) == Optional!uint(0));
+}
+
+/** 
+ * Writes a hex string to a buffer for a given value.
+ * Params:
+ *   value = The unsigned integer value to write.
+ *   buffer = The buffer to write to.
+ * Returns: The number of characters that were written.
+ */
+uint writeHexString(uint value, char[] buffer) {
+    const(char[]) chars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+    if (value == 0) {
+        buffer[0] = '0';
+        return 1;
+    }
+    uint index = 0;
+    while (value > 0) {
+        buffer[index++] = chars[value & 0xF];
+        value = value >>> 4;
+    }
+    reverseArray(buffer[0 .. index]);
+    return index;
+}
+
+unittest {
+    char[10] buffer;
+    assert(writeHexString(4, buffer) == 1);
+    assert(buffer[0] == '4', cast(string) buffer[0 .. 1]);
+    
+    assert(writeHexString(42, buffer) == 2);
+    assert(buffer[0 .. 2] == cast(char[2]) "2A", cast(string) buffer[0 .. 2]);
+
+    assert(writeHexString(0, buffer) == 1);
+    assert(buffer[0] == '0', cast(string) buffer[0 .. 1]);
+
+    assert(writeHexString(4_684_234, buffer) == 6);
+    assert(buffer[0 .. 6] == cast(char[6]) "4779CA", cast(string) buffer[0 .. 6]);
+}
