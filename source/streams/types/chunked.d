@@ -32,6 +32,25 @@ unittest {
     assert(readHexString(buffer[0 .. 4]) == Optional!uint.init);
 }
 
+private uint writeHexString(uint value, char[] buffer) {
+    const(char[]) chars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+    uint index = 0;
+    while (value > 0) {
+        ubyte nibble = value % 16;
+        buffer[index++] = chars[nibble];
+        value = value >> 4;
+    }
+    return index;
+}
+
+unittest {
+    char[10] buffer;
+    uint result = writeHexString(4, buffer);
+    assert(result == 1);
+    import std.stdio;
+    writeln(buffer);
+}
+
 struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
     private S* stream;
     private uint currentChunkSize = 0;
