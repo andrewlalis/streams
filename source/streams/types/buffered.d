@@ -5,16 +5,24 @@
  */
 module streams.types.buffered;
 
-import streams.primitives : StreamType, isInputStream, isOutputStream;
+import streams.primitives : StreamType, isInputStream, isSomeInputStream, isOutputStream, isSomeOutputStream;
 
+/** 
+ * The default size for buffered input and output streams.
+ */
 const uint DEFAULT_BUFFER_SIZE = 4096;
 
 /** 
- * A buffered wrapper around another input stream, that buffers reads according
- * to the size of buffer provided to its `readFromStream` method.
+ * A buffered wrapper around another input stream, that buffers data that's
+ * been read into an internal buffer, so that calls to `readToStream` don't all
+ * necessitate reading from the underlying resource.
  */
-struct BufferedInputStream(S, E = StreamType!S) if (isInputStream!(S, E)) {
+struct BufferedInputStream(S, E = StreamType!S, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isInputStream!(S, E)) {
     private S* stream;
+    private E[BufferSize] internalBuffer;
+    private uint nextIndex = BufferSize;
+    private uint elementsInBuffer = 0;
+    private bool streamEnded = false;
 
     /** 
      * Constructs a buffered input stream to buffer reads from the given stream.
@@ -26,38 +34,92 @@ struct BufferedInputStream(S, E = StreamType!S) if (isInputStream!(S, E)) {
     }
 
     /** 
-     * Reads `buffer.length` items from the stream, and returning only once
-     * exactly that many items have been read, or an error occurs.
+     * Reads elements into the given buffer, first pulling from this buffered
+     * stream's internal buffer, and then reading from the underlying stream.
      * Params:
      *   buffer = The buffer to read items to.
-     * Returns: `buffer.length` on success, or `-1` on error.
+     * Returns: The number of elements read, or -1 in case of error.
      */
     int readFromStream(E[] buffer) {
-        uint bufferIndex = 0;
-        while (bufferIndex < buffer.length) {
-            int elementsRead = this.stream.readFromStream(buffer[bufferIndex .. $]);
-            if (elementsRead == 0) {
-                return bufferIndex; // Return the total number of elements we read so far.
-            } else if (elementsRead == -1) {
-                return -1;
+        int elementsRead = 0;
+        while (elementsRead < buffer.length) {
+            // First copy as much as we can from our internal buffer to the outbuffer.
+            E[] writableSlice = buffer[elementsRead .. $];
+            uint elementsFromInternal = this.readFromInternalBuffer(writableSlice);
+            elementsRead += elementsFromInternal;
+
+            // Then, if necessary, refresh the internal buffer.
+            if (elementsRead < buffer.length && !this.streamEnded) {
+                int readResult = this.refreshInternalBuffer();
+                if (readResult < 0) return readResult;
+            } else if (this.streamEnded) {
+                break; // Quit reading if the stream has ended.
             }
-            bufferIndex += elementsRead;
         }
-        return cast(uint) buffer.length;
+        return elementsRead;
     }
+
+    /** 
+     * Reads as many elements as possible from the internal buffer, writing to
+     * the given buffer parameter.
+     * Params:
+     *   buffer = The buffer to write to.
+     * Returns: The number of elements that were read.
+     */
+    private uint readFromInternalBuffer(E[] buffer) {
+        if (this.elementsInBuffer == 0) return 0;
+        const uint elementsAvailable = this.elementsInBuffer - this.nextIndex;
+        if (elementsAvailable == 0) return 0;
+        const uint elementsToCopy = elementsAvailable < buffer.length ? elementsAvailable : cast(uint) buffer.length;
+        buffer[0 .. elementsToCopy] = this.internalBuffer[this.nextIndex .. this.nextIndex + elementsToCopy];
+        this.nextIndex += elementsToCopy;
+        return elementsToCopy;
+    }
+
+    /** 
+     * Refreshes the internal buffer by reading from the underlying stream.
+     * Returns: The result of the stream read operation.
+     */
+    private int refreshInternalBuffer() {
+        if (this.streamEnded) return 0;
+        int result = this.stream.readFromStream(this.internalBuffer);
+        if (result < 0) return result; // Exit right away in case of error.
+        this.nextIndex = 0;
+        if (result < BufferSize) {
+            this.streamEnded = true;
+        }
+        this.elementsInBuffer = result;
+        return result;
+    }
+}
+
+/** 
+ * Creates and returns a buffered input stream that's wrapped around the given
+ * input stream.
+ * Params:
+ *   stream = The stream to wrap in a buffered input stream.
+ * Returns: The buffered input stream.
+ */
+BufferedInputStream!S bufferedInputStreamFor(S, uint BufferSize = DEFAULT_BUFFER_SIZE)(
+    ref S stream
+) if (isSomeInputStream!S) {
+    return BufferedInputStream!(S, StreamType!S, BufferSize)(stream);
 }
 
 unittest {
     import streams.types.array : arrayInputStreamFor;
 
+    // Test basic operations.
     int[4] sInData = [1, 2, 3, 4];
     auto sIn1 = arrayInputStreamFor!int(sInData);
-    auto bufIn1 = BufferedInputStream!(typeof(sIn1), int)(sIn1);
+    auto bufIn1 = bufferedInputStreamFor(sIn1);
     int[1] buf1;
-    assert(bufIn1.readFromStream(buf1[]) == 1);
+    int readResult1 = bufIn1.readFromStream(buf1);
+    assert(readResult1 == 1);
     assert(buf1 == [1]);
     int[4] buf2;
-    assert(bufIn1.readFromStream(buf2[]) == 3);
+    int readResult2 = bufIn1.readFromStream(buf2);
+    assert(readResult2 == 3);
 
     // Check that a read error propagates.
     import streams.primitives : ErrorInputStream;
@@ -65,6 +127,13 @@ unittest {
     auto bufIn3 = BufferedInputStream!(typeof(sIn3), int)(sIn3);
     int[64] buf3;
     assert(bufIn3.readFromStream(buf3) == -1);
+
+    // Check that a closed input stream results in reads of 0.
+    import streams.primitives : NoOpInputStream;
+    auto sIn4 = NoOpInputStream!bool();
+    auto bufIn4 = BufferedInputStream!(typeof(sIn4))(sIn4);
+    bool[3] buf4;
+    assert(bufIn4.readFromStream(buf4) == 0);
 }
 
 /** 

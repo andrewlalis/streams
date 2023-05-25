@@ -11,22 +11,22 @@ import streams.primitives : isInputStream, isOutputStream, isByteInputStream, is
 import streams.utils : Optional, Either;
 import std.traits : isScalarType, isStaticArray;
 
-/** 
+/**
  * Information about an error that occurred while reading or writing in a
  * data stream.
  */
 struct DataStreamError {
-    /** 
+    /**
      * A description of the error that occurred.
      */
     const(char[]) message;
-    /** 
+    /**
      * The return value from the stream operation that caused the error.
      */
     const int lastStreamResult;
 }
 
-/** 
+/**
  * The result of a data input stream read operation, which is either a value
  * or an error.
  */
@@ -105,8 +105,8 @@ private void ensureByteOrder(T)(
 }
 
 /** 
- * An output stream that is wrapped around a byte output stream, so that values
- * may be written to the stream as bytes.
+ * An input stream that is wrapped around a byte input stream, so that values
+ * may be read from the stream as bytes.
  */
 struct DataInputStream(S) if (isByteInputStream!S) {
     private S* stream;
@@ -231,8 +231,8 @@ DataInputStream!S dataInputStreamFor(S)(
 }
 
 /** 
- * An input stream that is wrapped around a byte input stream, so that values
- * may be read from the stream as bytes.
+ * An output stream that is wrapped around a byte output stream, so that values
+ * may be written to the stream as bytes.
  */
 struct DataOutputStream(S) if (isByteOutputStream!S) {
     private S* stream;
