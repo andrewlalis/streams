@@ -1,8 +1,6 @@
 module streams.types.chunked;
 
 import streams.primitives : isByteInputStream, isByteOutputStream, isFlushableStream, isClosableStream;
-import streams.types.data : DataInputStream, dataInputStreamFor, DataOutputStream, dataOutputStreamFor;
-import streams.utils : readHexString, writeHexString;
 
 /** 
  * An input stream for reading from a chunked-encoded stream of bytes.
@@ -32,6 +30,8 @@ struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
 
         while (bytesRead < buffer.length) {
             if (this.currentChunkSize == 0 || this.currentChunkIndex == this.currentChunkSize) {
+                import streams.types.data : DataInputStream, dataInputStreamFor, DataReadResult;
+                import streams.utils : Optional, readHexString;
                 // Try to read the next chunk header.
                 DataInputStream!S dIn = dataInputStreamFor(*this.stream);
                 char[32] hexChars;
@@ -141,6 +141,8 @@ struct ChunkedEncodingOutputStream(S) if (isByteOutputStream!S) {
     }
 
     private int writeChunkHeader(uint size) {
+        import streams.utils : writeHexString;
+        
         char[32] chars;
         uint sizeStrLength = writeHexString(size, chars);
         chars[sizeStrLength] = '\r';
@@ -170,3 +172,5 @@ unittest {
     assert(isFlushableStream!(typeof(chunkedOut)));
     assert(isClosableStream!(typeof(chunkedOut)));
 }
+
+// TODO: Add complete tests for both!
