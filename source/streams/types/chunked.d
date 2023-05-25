@@ -50,6 +50,7 @@ private uint writeHexString(uint value, char[] buffer) {
         writefln!"buffer = %s"(buffer);
         value = value >>> 4;
     }
+    reverseArray(buffer[0 .. index]);
     return index;
 }
 
