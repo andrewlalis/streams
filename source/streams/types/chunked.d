@@ -30,10 +30,18 @@ unittest {
     assert(readHexString(buffer[0 .. 2]) == Optional!uint(42));
     buffer[0 .. 4] = cast(char[4]) "bleh";
     assert(readHexString(buffer[0 .. 4]) == Optional!uint.init);
+    buffer[0 .. 6] = cast(char[6]) "4779CA";
+    assert(readHexString(buffer[0 .. 6]) == Optional!uint(4_684_234));
+    buffer[0] = '0';
+    assert(readHexString(buffer[0 .. 1]) == Optional!uint(0));
 }
 
 private uint writeHexString(uint value, char[] buffer) {
     const(char[]) chars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+    if (buffer == 0) {
+        buffer[0] = '0';
+        return 1;
+    }
     uint index = 0;
     while (value > 0) {
         ubyte nibble = value % 16;
@@ -45,10 +53,18 @@ private uint writeHexString(uint value, char[] buffer) {
 
 unittest {
     char[10] buffer;
-    uint result = writeHexString(4, buffer);
-    assert(result == 1);
-    import std.stdio;
-    writeln(buffer);
+    assert(writeHexString(4, buffer) == 1);
+    assert(buffer[0] == '4');
+    
+    assert(writeHexString(42, buffer) == 2);
+    assert(buffer[0] == '2');
+    assert(buffer[1] == 'A');
+
+    assert(writeHexString(0, buffer) == 1);
+    assert(buffer[0] == '0');
+
+    assert(writeHexString(4_684_234, buffer) == 6);
+    assert(buffer[0 .. 6] == cast(char[6]) "4779CA");
 }
 
 struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
