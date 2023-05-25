@@ -142,12 +142,12 @@ struct ChunkedEncodingOutputStream(S) if (isByteOutputStream!S) {
 
     private int writeChunkHeader(uint size) {
         import streams.utils : writeHexString;
-        
+
         char[32] chars;
         uint sizeStrLength = writeHexString(size, chars);
         chars[sizeStrLength] = '\r';
         chars[sizeStrLength + 1] = '\n';
-        int bytesWritten = this.stream.writeToStream(chars[0 .. sizeStrLength + 2]);
+        int bytesWritten = this.stream.writeToStream(cast(ubyte[]) chars[0 .. sizeStrLength + 2]);
         if (bytesWritten < 0) return bytesWritten;
         if (bytesWritten != sizeStrLength + 2) return -1;
         return bytesWritten;
