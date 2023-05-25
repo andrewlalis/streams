@@ -44,9 +44,8 @@ private uint writeHexString(uint value, char[] buffer) {
     }
     uint index = 0;
     while (value > 0) {
-        ubyte nibble = value % 16;
-        buffer[index++] = chars[nibble];
-        value = value >> 4;
+        buffer[index++] = chars[value & 0xF];
+        value = value >>> 4;
     }
     return index;
 }
