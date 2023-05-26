@@ -4,6 +4,8 @@
  */
 module streams.types.file;
 
+import streams.primitives;
+
 import core.stdc.stdio : fopen, fclose, fread, fwrite, fflush, feof, ferror, FILE;
 
 /** 
@@ -22,22 +24,23 @@ struct FileInputStream {
         this(fopen(filename, "rb"));
     }
 
-    int readFromStream(ubyte[] buffer) {
+    StreamResult readFromStream(ubyte[] buffer) {
         if (this.filePtr is null) {
-            return 0;
+            return StreamResult(StreamError("File is not open.", -1));
         }
         size_t bytesRead = fread(buffer.ptr, ubyte.sizeof, buffer.length, this.filePtr);
         if (bytesRead != buffer.length && ferror(this.filePtr) != 0) {
-            return -1; // cov-ignore
+            return StreamResult(StreamError("An error occurred while reading.", cast(int) bytesRead)); // cov-ignore
         }
-        return cast(int) bytesRead;
+        return StreamResult(cast(uint) bytesRead);
     }
 
-    void closeStream() {
+    OptionalStreamError closeStream() {
         if (this.filePtr !is null) {
             fclose(this.filePtr);
             this.filePtr = null;
         }
+        return OptionalStreamError.init;
     }
 }
 
@@ -62,7 +65,7 @@ unittest {
     // Check that after closing the stream, the file pointer is nullified.
     assert(fIn.filePtr is null);
     ubyte[3] tempBuffer;
-    assert(fIn.readFromStream(tempBuffer) == 0); // Reading after closed should return 0.
+    assert(fIn.readFromStream(tempBuffer).hasError); // Reading after closed should error.
 
     // Check that the number of bytes read matches.
     assert(sOut.toArrayRaw().length == expectedFilesize);
@@ -96,28 +99,30 @@ struct FileOutputStream {
         this(fopen(filename, "wb"));
     }
 
-    int writeToStream(ubyte[] buffer) {
+    StreamResult writeToStream(ubyte[] buffer) {
         if (this.filePtr is null) {
-            return 0;
+            return StreamResult(StreamError("File is not open.", -1));
         }
         size_t bytesWritten = fwrite(buffer.ptr, ubyte.sizeof, buffer.length, this.filePtr);
         if (bytesWritten < buffer.length && ferror(this.filePtr) != 0) {
-            return -1; // cov-ignore
+            return StreamResult(StreamError("An error occurred while writing.", cast(int) bytesWritten)); // cov-ignore
         }
-        return cast(int) bytesWritten;
+        return StreamResult(cast(uint) bytesWritten);
     }
 
-    void flushStream() {
+    OptionalStreamError flushStream() {
         if (this.filePtr !is null) {
             fflush(this.filePtr);
         }
+        return OptionalStreamError.init;
     }
 
-    void closeStream() {
+    OptionalStreamError closeStream() {
         if (this.filePtr !is null) {
             fclose(this.filePtr);
             this.filePtr = null;
         }
+        return OptionalStreamError.init;
     }
 }
 
@@ -163,5 +168,5 @@ unittest {
     // Check that the file pointer is closed upon closing the stream.
     fOut.closeStream();
     assert(fOut.filePtr is null);
-    assert(fOut.writeToStream(cast(ubyte[5]) content) == 0);
+    assert(fOut.writeToStream(cast(ubyte[5]) content).hasError);
 }

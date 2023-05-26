@@ -3,6 +3,8 @@
  */
 module streams.types.array;
 
+import streams.primitives : StreamResult, StreamError, OptionalStreamError;
+
 /** 
  * An input stream that reads from an array of items.
  */
@@ -19,22 +21,23 @@ struct ArrayInputStream(E) {
      *   buffer = The buffer read array elements into.
      * Returns: The number of elements that were read.
      */
-    int readFromStream(E[] buffer) {
-        if (this.currentIndex >= this.array.length) return 0;
+    StreamResult readFromStream(E[] buffer) {
+        if (this.currentIndex >= this.array.length) return StreamResult(0);
         uint bufferLength = cast(uint) buffer.length;
         uint lengthRemaining = cast(uint) this.array.length - this.currentIndex;
         uint lengthToRead = lengthRemaining < bufferLength ? lengthRemaining : bufferLength;
         buffer[0 .. lengthToRead] = this.array[this.currentIndex .. this.currentIndex + lengthToRead];
         this.currentIndex += lengthToRead;
-        return lengthToRead;
+        return StreamResult(lengthToRead);
     }
 
     /** 
      * Resets this input stream's record of the next index to read from, so
      * that the next call to `read` will read from the start of the array.
      */
-    void reset() {
+    OptionalStreamError reset() {
         this.currentIndex = 0;
+        return OptionalStreamError.init;
     }
 }
 
@@ -47,15 +50,15 @@ unittest {
     int[5] data = [1, 2, 3, 4, 5];
     auto s1 = ArrayInputStream!int(data);
     int[2] buffer;
-    assert(s1.readFromStream(buffer) == 2);
+    assert(s1.readFromStream(buffer) == StreamResult(2));
     assert(buffer == [1, 2]);
-    assert(s1.readFromStream(buffer) == 2);
+    assert(s1.readFromStream(buffer) == StreamResult(2));
     assert(buffer == [3, 4]);
-    assert(s1.readFromStream(buffer) == 1);
+    assert(s1.readFromStream(buffer) == StreamResult(1));
     assert(buffer == [5, 4]);
 
     s1.reset();
-    assert(s1.readFromStream(buffer) == 2);
+    assert(s1.readFromStream(buffer) == StreamResult(2));
     assert(buffer == [1, 2]);
 }
 
@@ -94,9 +97,9 @@ struct ArrayOutputStream(E) {
      * Returns: The number of elements that were written. Barring memory
      * issues, this will always equal the buffer's length.
      */
-    int writeToStream(E[] buffer) {
+    StreamResult writeToStream(E[] buffer) {
         this.buffer.appendItems(buffer);
-        return cast(uint) buffer.length;
+        return StreamResult(cast(uint) buffer.length);
     }
 
     version (D_BetterC) {} else {
@@ -158,9 +161,9 @@ unittest {
 
     auto s1 = arrayOutputStreamFor!float;
     float[3] buffer = [0.5, 1, 1.5];
-    assert(s1.writeToStream(buffer) == 3);
+    assert(s1.writeToStream(buffer) == StreamResult(3));
     buffer = [2, 2.5, 3];
-    assert(s1.writeToStream(buffer) == 3);
+    assert(s1.writeToStream(buffer) == StreamResult(3));
     assert(s1.toArrayRaw() == [0.5, 1, 1.5, 2, 2.5, 3]);
     assert(s1.toArrayRaw() == [0.5, 1, 1.5, 2, 2.5, 3]);
 

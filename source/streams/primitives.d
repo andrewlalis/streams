@@ -26,6 +26,7 @@
  */
 module streams.primitives;
 
+import streams.utils : Optional, Either;
 import std.range : ElementType;
 import std.traits : isCallable, ReturnType, Parameters, isDynamicArray;
 
@@ -34,6 +35,28 @@ private const OUTPUT_STREAM_METHOD = "writeToStream";
 private const FLUSHABLE_STREAM_METHOD = "flushStream";
 private const CLOSABLE_STREAM_METHOD = "closeStream";
 private const SEEKABLE_STREAM_METHOD = "seekInStream";
+
+/**
+ * An error that occurred during a stream operation, which includes a short
+ * message, as well as an integer code which is usually the last stream
+ * operation return code.
+ */
+struct StreamError {
+    const(char[]) message;
+    const int code;
+}
+
+/**
+ * A convenience alias for an optional stream error, which is a common return
+ * type for many stream methods.
+ */
+alias OptionalStreamError = Optional!StreamError;
+
+/**
+ * Either a number of bytes that have been read or written, or a stream error,
+ * as a common result type for many stream operations.
+ */
+alias StreamResult = Either!(uint, "bytes", StreamError, "error");
 
 /** 
  * Determines if the given template argument is some form of input stream,
@@ -48,7 +71,7 @@ bool isSomeInputStream(StreamType)() {
     // Note: We use a cascading static check style so the compiler runs these checks in this order.
     static if (__traits(hasMember, StreamType, INPUT_STREAM_METHOD)) {
         alias func = __traits(getMember, StreamType, INPUT_STREAM_METHOD);
-        static if (isCallable!func && is(ReturnType!func == int)) {
+        static if (isCallable!func && is(ReturnType!func == StreamResult)) {
             static if (Parameters!func.length == 1) {
                 return isDynamicArray!(Parameters!func[0]);
             } else { return false; }
@@ -58,15 +81,15 @@ bool isSomeInputStream(StreamType)() {
 
 unittest {
     struct S1 {
-        int readFromStream(ubyte[] buffer) { return 0; } // cov-ignore
+        StreamResult readFromStream(ubyte[] buffer) { return StreamResult(0); } // cov-ignore
     }
     assert(isSomeInputStream!S1);
     struct S2 {
-        int readFromStream(bool[] buffer) { return 42; } // cov-ignore
+        StreamResult readFromStream(bool[] buffer) { return StreamResult(42); } // cov-ignore
     }
     assert(isSomeInputStream!S2);
     struct S3 {
-        int readFromStream(bool[] buffer, int otherArg) { return 0; } // cov-ignore
+        StreamResult readFromStream(bool[] buffer, int otherArg) { return StreamResult(0); } // cov-ignore
     }
     assert(!isSomeInputStream!S3);
     struct S4 {
@@ -74,7 +97,7 @@ unittest {
     }
     assert(!isSomeInputStream!S4);
     struct S5 {
-        int readFromStream = 10;
+        StreamResult readFromStream = StreamResult(10);
     }
     assert(!isSomeInputStream!S5);
     struct S6 {}
@@ -82,11 +105,11 @@ unittest {
     
     version (D_BetterC) {} else {
         interface I1 {
-            int readFromStream(ubyte[] buffer);
+            StreamResult readFromStream(ubyte[] buffer);
         }
         assert(isSomeInputStream!I1);
         class C1 {
-            int readFromStream(ubyte[] buffer) { return 0; } // cov-ignore
+            StreamResult readFromStream(ubyte[] buffer) { return StreamResult(0); } // cov-ignore
         }
         assert(isSomeInputStream!C1);
     }
@@ -105,7 +128,7 @@ bool isSomeOutputStream(StreamType)() {
     // Note: We use a cascading static check style so the compiler runs these checks in this order.
     static if (__traits(hasMember, StreamType, OUTPUT_STREAM_METHOD)) {
         alias func = __traits(getMember, StreamType, OUTPUT_STREAM_METHOD);
-        static if (isCallable!func && is(ReturnType!func == int)) {
+        static if (isCallable!func && is(ReturnType!func == StreamResult)) {
             static if (Parameters!func.length == 1) {
                 return isDynamicArray!(Parameters!func[0]);
             } else { return false; }
@@ -115,15 +138,15 @@ bool isSomeOutputStream(StreamType)() {
 
 unittest {
     struct S1 {
-        int writeToStream(ubyte[] buffer) { return 0; } // cov-ignore
+        StreamResult writeToStream(ubyte[] buffer) { return StreamResult(0); } // cov-ignore
     }
     assert(isSomeOutputStream!S1);
     struct S2 {
-        int writeToStream(bool[] buffer) { return 42; } // cov-ignore
+        StreamResult writeToStream(bool[] buffer) { return StreamResult(42); } // cov-ignore
     }
     assert(isSomeOutputStream!S2);
     struct S3 {
-        int writeToStream(bool[] buffer, int otherArg) { return 0; } // cov-ignore
+        StreamResult writeToStream(bool[] buffer, int otherArg) { return StreamResult(0); } // cov-ignore
     }
     assert(!isSomeOutputStream!S3);
     struct S4 {
@@ -131,7 +154,7 @@ unittest {
     }
     assert(!isSomeOutputStream!S4);
     struct S5 {
-        int writeToStream = 10;
+        StreamResult writeToStream = StreamResult(10);
     }
     assert(!isSomeOutputStream!S5);
     struct S6 {}
@@ -153,8 +176,8 @@ template StreamType(S) if (isSomeStream!S) {
 
 unittest {
     struct S1 {
-        int readFromStream(bool[] buffer) {
-            return 0; // cov-ignore
+        StreamResult readFromStream(bool[] buffer) {
+            return StreamResult(0); // cov-ignore
         }
     }
     assert(is(StreamType!S1 == bool));
@@ -176,8 +199,8 @@ bool isInputStream(StreamType, DataType)() {
 unittest {
     // Test a valid input stream.
     struct S1 {
-        int readFromStream(ubyte[] buffer) {
-            return 0; // cov-ignore
+        StreamResult readFromStream(ubyte[] buffer) {
+            return StreamResult(0); // cov-ignore
         }
     }
     assert(isInputStream!(S1, ubyte));
@@ -192,16 +215,16 @@ unittest {
     }
     assert(!isInputStream!(S3, ubyte));
     struct S4 {
-        int readFromStream() {
-            return 0; // cov-ignore
+        StreamResult readFromStream() {
+            return StreamResult(0); // cov-ignore
         }
     }
     assert(!isInputStream!(S4, ubyte));
 
     version (D_BetterC) {} else {
         class C1 {
-            int readFromStream(char[] buffer) {
-                return 0; // cov-ignore
+            StreamResult readFromStream(char[] buffer) {
+                return StreamResult(0); // cov-ignore
             }
         }
         assert(isInputStream!(C1, char));
@@ -224,8 +247,8 @@ bool isOutputStream(StreamType, DataType)() {
 unittest {
     // Test a valid output stream.
     struct S1 {
-        int writeToStream(ref ubyte[] buffer) {
-            return 0; // cov-ignore
+        StreamResult writeToStream(ref ubyte[] buffer) {
+            return StreamResult(0); // cov-ignore
         }
     }
     assert(isOutputStream!(S1, ubyte));
@@ -240,8 +263,8 @@ unittest {
     }
     assert(!isOutputStream!(S3, ubyte));
     struct S4 {
-        int writeToStream() {
-            return 0; // cov-ignore
+        StreamResult writeToStream() {
+            return StreamResult(0); // cov-ignore
         }
     }
     assert(!isOutputStream!(S4, ubyte));
@@ -259,14 +282,14 @@ bool isSomeStream(StreamType)() {
 
 unittest {
     struct S1 {
-        int readFromStream(ubyte[] buffer) {
-            return 0; // cov-ignore
+        StreamResult readFromStream(ubyte[] buffer) {
+            return StreamResult(0); // cov-ignore
         }
     }
     assert(isSomeStream!S1);
     struct S2 {
-        int writeToStream(ubyte[] buffer) {
-            return 0; // cov-ignore
+        StreamResult writeToStream(ubyte[] buffer) {
+            return StreamResult(0); // cov-ignore
         }
     }
     assert(isSomeStream!S2);
@@ -314,7 +337,7 @@ bool isClosableStream(S)() {
     ) {
         alias closeFunction = __traits(getMember, S, CLOSABLE_STREAM_METHOD);
         alias params = Parameters!closeFunction;
-        return (is(ReturnType!closeFunction == void) && params.length == 0);
+        return (is(ReturnType!closeFunction == OptionalStreamError) && params.length == 0);
     } else {
         return false;
     }
@@ -322,15 +345,17 @@ bool isClosableStream(S)() {
 
 unittest {
     struct S1 {
-        int readFromStream(ubyte[] buffer) {
-            return 0; // cov-ignore
+        StreamResult readFromStream(ubyte[] buffer) {
+            return StreamResult(0); // cov-ignore
         }
-        void closeStream() {}
+        OptionalStreamError closeStream() {
+            return OptionalStreamError.init; // cov-ignore
+        }
     }
     assert(isClosableStream!S1);
     struct S2 {
-        int readFromStream(ubyte[] buffer) {
-            return 0; // cov-ignore
+        StreamResult readFromStream(ubyte[] buffer) {
+            return StreamResult(0); // cov-ignore
         }
     }
     assert(!isClosableStream!S2);
@@ -354,7 +379,7 @@ bool isFlushableStream(S)() {
     ) {
         alias flushFunction = __traits(getMember, S, FLUSHABLE_STREAM_METHOD);
         alias params = Parameters!flushFunction;
-        return (is(ReturnType!flushFunction == void) && params.length == 0);
+        return (is(ReturnType!flushFunction == OptionalStreamError) && params.length == 0);
     } else {
         return false;
     }
@@ -362,15 +387,17 @@ bool isFlushableStream(S)() {
 
 unittest {
     struct S1 {
-        int writeToStream(ubyte[] buffer) {
-            return 0; // cov-ignore
+        StreamResult writeToStream(ubyte[] buffer) {
+            return StreamResult(0); // cov-ignore
         }
-        void flushStream() {}
+        OptionalStreamError flushStream() {
+            return OptionalStreamError.init; // cov-ignore
+        }
     }
     assert(isFlushableStream!S1);
     struct S2 {
-        int writeToStream(ubyte[] buffer) {
-            return 0; // cov-ignore
+        StreamResult writeToStream(ubyte[] buffer) {
+            return StreamResult(0); // cov-ignore
         }
     }
     assert(!isFlushableStream!S2);
@@ -399,28 +426,12 @@ bool isSeekableStream(S)() {
     }
 }
 
-version (D_BetterC) {} else {
-    /** 
-     * An exception that may be thrown if an illegal operation or error occurs
-     * while working with streams. Generally, if an exception is to be thrown while
-     * reading or writing in a stream's implementation, a `StreamException` should
-     * be wrapped around it to provide a common interface for error handling.
-     *
-     * This is not available in BetterC mode.
-     */
-    class StreamException : Exception {
-        import std.exception;
-
-        mixin basicExceptionCtors;
-    }
-}
-
 /** 
  * An input stream that always reads 0 elements.
  */
 struct NoOpInputStream(T) {
-    int readFromStream(T[] buffer) {
-        return 0;
+    StreamResult readFromStream(T[] buffer) {
+        return StreamResult(0);
     }
 }
 
@@ -428,8 +439,8 @@ struct NoOpInputStream(T) {
  * An output stream that always writes 0 elements.
  */
 struct NoOpOutputStream(T) {
-    int writeToStream(T[] buffer) {
-        return 0;
+    StreamResult writeToStream(T[] buffer) {
+        return StreamResult(0);
     }
 }
 
@@ -437,8 +448,8 @@ struct NoOpOutputStream(T) {
  * An input stream that always returns a -1 error response.
  */
 struct ErrorInputStream(T) {
-    int readFromStream(T[] buffer) {
-        return -1;
+    StreamResult readFromStream(T[] buffer) {
+        return StreamResult(StreamError("An error occurred.", -1));
     }
 }
 
@@ -446,23 +457,23 @@ struct ErrorInputStream(T) {
  * An output stream that always returns a -1 error response.
  */
 struct ErrorOutputStream(T) {
-    int writeToStream(T[] buffer) {
-        return -1;
+    StreamResult writeToStream(T[] buffer) {
+        return StreamResult(StreamError("An error occurred.", -1));
     }
 }
 
 unittest {
     auto s1 = NoOpInputStream!ubyte();
     ubyte[3] buffer;
-    assert(s1.readFromStream(buffer) == 0);
+    assert(s1.readFromStream(buffer) == StreamResult(0));
     assert(buffer == [0, 0, 0]);
     
     auto s2 = NoOpOutputStream!ubyte();
-    assert(s2.writeToStream(buffer) == 0);
+    assert(s2.writeToStream(buffer) == StreamResult(0));
 
     auto s3 = ErrorInputStream!ubyte();
-    assert(s3.readFromStream(buffer) == -1);
+    assert(s3.readFromStream(buffer).hasError);
 
     auto s4 = ErrorOutputStream!ubyte();
-    assert(s4.writeToStream(buffer) == -1);
+    assert(s4.writeToStream(buffer).hasError);
 }

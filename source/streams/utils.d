@@ -25,6 +25,7 @@ unittest {
     Optional!int op1;
     assert(op1.present == false);
     assert(op1.value == int.init);
+    assert(op1.notPresent);
     Optional!bool op2 = Optional!bool(true);
     assert(op2.present);
     assert(op2.value == true);
@@ -32,22 +33,33 @@ unittest {
 
 /** 
  * A type that contains either an element of A, or an element of B, but not both.
+ * You can access the given names directly, so for example:
+ *
+ * `auto s = Either!(bool, "first", float, "second")(true);`
+ *
+ * will allow you to call `s.first`, `s.second`, `s.hasFirst`, and `s.hasSecond`.
  */
 struct Either(A, string NameA, B, string NameB) if (!is(A == B)) {
     union U {
         A a;
         B b;
+        this(A a) {
+            this.a = a;
+        }
+        this(B b) {
+            this.b = b;
+        }
     }
-    private const bool hasA;
-    private const U u;
+    private bool hasA = true;
+    private U u;
 
     this(A value) {
-        this.u = value;
+        this.u = U(value);
         this.hasA = true;
     }
 
     this(B value) {
-        this.u = value;
+        this.u = U(value);
         this.hasA = false;
     }
 
@@ -61,12 +73,16 @@ struct Either(A, string NameA, B, string NameB) if (!is(A == B)) {
 
     bool opDispatch(string member)() const if (member.length > 3 && member[0 .. 3] == "has") {
         const string suffix = member[3 .. $];
-        static if (suffix == NameA) {
+
+        static if (suffix == formatPascal(NameA)) {
             return this.hasA;
-        } else static if (suffix == NameB) {
+        } else static if (suffix == formatPascal(NameB)) {
             return !this.hasA;
         } else {
-            assert(false, "Invalid member. Expected \"has");
+            static assert(
+                false,
+                "Invalid member. Expected \"has" ~ formatPascal(NameA) ~ "\" or \"has" ~ formatPascal(NameB) ~ "\"."
+            );
         }
     }
 
@@ -86,14 +102,34 @@ struct Either(A, string NameA, B, string NameB) if (!is(A == B)) {
 
 unittest {
     auto e1 = Either!(int, "first", bool, "second")(5);
+    assert(e1.has!"first");
     assert(e1.hasFirst);
+    assert(!e1.has!"second");
     assert(!e1.hasSecond);
     assert(e1.first == 5);
 
     auto e2 = Either!(float, "first", ubyte, "second")(3u);
+    assert(!e2.has!"first");
     assert(!e2.hasFirst);
+    assert(e2.has!"second");
     assert(e2.hasSecond);
     assert(e2.second == 3);
+}
+
+private string formatPascal(string s) {
+    if (s.length == 0) return s;
+    const char diff = 'a' - 'A';
+    if (s[0] >= 'a' && s[0] <= 'z') {
+        return cast(char) (s[0] - diff) ~ s[1 .. $];
+    } else {
+        return s;
+    }
+}
+
+unittest {
+    assert(formatPascal("hello") == "Hello");
+    assert(formatPascal("123Testing") == "123Testing");
+    assert(formatPascal("helloWorld!") == "HelloWorld!");
 }
 
 /** 
@@ -304,7 +340,7 @@ unittest {
  * Returns: The number of characters that were written.
  */
 uint writeHexString(uint value, char[] buffer) {
-    const(char[]) chars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+    const(char[16]) chars = "0123456789ABCDEF";
     if (value == 0) {
         buffer[0] = '0';
         return 1;

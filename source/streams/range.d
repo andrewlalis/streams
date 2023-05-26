@@ -4,7 +4,7 @@
  */
 module streams.range;
 
-import streams.primitives : StreamType, isInputStream, isSomeInputStream, isOutputStream, isSomeStream;
+import streams.primitives : StreamResult, StreamType, isInputStream, isSomeInputStream, isOutputStream, isSomeStream;
 import streams.utils : Optional;
 import std.range : isInputRange, isOutputRange, ElementType, empty, front, popFront, put;
 
@@ -15,7 +15,7 @@ import std.range : isInputRange, isOutputRange, ElementType, empty, front, popFr
 struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
     private S* stream;
     private Optional!E lastElement;
-    private int lastRead;
+    private StreamResult lastRead;
 
     this(ref S stream) {
         this.stream = &stream;
@@ -26,7 +26,7 @@ struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
     void popFront() {
         E[1] buffer;
         this.lastRead = this.stream.readFromStream(buffer);
-        if (this.lastRead > 0) {
+        if (this.lastRead.hasBytes && this.lastRead.bytes > 0) {
             this.lastElement = Optional!E(buffer[0]);
         } else {
             this.lastElement = Optional!E.init;
@@ -34,7 +34,7 @@ struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
     }
 
     bool empty() {
-        return this.lastRead < 1;
+        return !this.lastRead.hasBytes || this.lastRead.bytes == 0;
     }
 
     E front() {
@@ -88,14 +88,14 @@ unittest {
 struct InputRangeStream(R, E = ElementType!R) if (isInputRange!R) {
     private R range;
 
-    int readFromStream(E[] buffer) {
+    StreamResult readFromStream(E[] buffer) {
         int readCount = 0;
         while (readCount < buffer.length && !this.range.empty()) {
             E element = this.range.front();
             buffer[readCount++] = element;
             this.range.popFront();
         }
-        return readCount;
+        return StreamResult(readCount);
     }
 }
 
@@ -179,9 +179,9 @@ unittest {
 struct OutputRangeStream(R, E = ElementType!R) if (isOutputRange!(R, E)) {
     private R range;
 
-    int writeToStream(E[] buffer) {
+    StreamResult writeToStream(E[] buffer) {
         this.range.put(buffer);
-        return cast(int) buffer.length;
+        return StreamResult(cast(uint) buffer.length);
     }
 }
 
@@ -199,11 +199,11 @@ unittest {
     ubyte[8192] r;
     auto s = asOutputStream(r[]);
     ubyte[3] buf = [1, 2, 3];
-    assert(s.writeToStream(buf) == 3);
+    assert(s.writeToStream(buf) == StreamResult(3));
     assert(r[0 .. 3] == [1, 2, 3]);
     buf[0] = 4;
     buf[1] = 5;
-    assert(s.writeToStream(buf[0 .. 2]) == 2);
+    assert(s.writeToStream(buf[0 .. 2]) == StreamResult(2));
     assert(r[0 .. 5] == [1, 2, 3, 4, 5]);
 }
 

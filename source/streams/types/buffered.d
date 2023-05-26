@@ -5,7 +5,7 @@
  */
 module streams.types.buffered;
 
-import streams.primitives : StreamType, isInputStream, isSomeInputStream, isOutputStream, isSomeOutputStream;
+import streams.primitives;
 
 /** 
  * The default size for buffered input and output streams.
@@ -40,7 +40,7 @@ struct BufferedInputStream(S, E = StreamType!S, uint BufferSize = DEFAULT_BUFFER
      *   buffer = The buffer to read items to.
      * Returns: The number of elements read, or -1 in case of error.
      */
-    int readFromStream(E[] buffer) {
+    StreamResult readFromStream(E[] buffer) {
         int elementsRead = 0;
         while (elementsRead < buffer.length) {
             // First copy as much as we can from our internal buffer to the outbuffer.
@@ -50,13 +50,13 @@ struct BufferedInputStream(S, E = StreamType!S, uint BufferSize = DEFAULT_BUFFER
 
             // Then, if necessary, refresh the internal buffer.
             if (elementsRead < buffer.length && !this.streamEnded) {
-                int readResult = this.refreshInternalBuffer();
-                if (readResult < 0) return readResult;
+                StreamResult readResult = this.refreshInternalBuffer();
+                if (readResult.hasError) return readResult;
             } else if (this.streamEnded) {
                 break; // Quit reading if the stream has ended.
             }
         }
-        return elementsRead;
+        return StreamResult(elementsRead);
     }
 
     /** 
@@ -80,15 +80,15 @@ struct BufferedInputStream(S, E = StreamType!S, uint BufferSize = DEFAULT_BUFFER
      * Refreshes the internal buffer by reading from the underlying stream.
      * Returns: The result of the stream read operation.
      */
-    private int refreshInternalBuffer() {
-        if (this.streamEnded) return 0;
-        int result = this.stream.readFromStream(this.internalBuffer);
-        if (result < 0) return result; // Exit right away in case of error.
+    private StreamResult refreshInternalBuffer() {
+        if (this.streamEnded) return StreamResult(0);
+        StreamResult result = this.stream.readFromStream(this.internalBuffer);
+        if (result.hasError) return result; // Exit right away in case of error.
         this.nextIndex = 0;
-        if (result < BufferSize) {
+        if (result.bytes < BufferSize) {
             this.streamEnded = true;
         }
-        this.elementsInBuffer = result;
+        this.elementsInBuffer = result.bytes;
         return result;
     }
 }
@@ -114,26 +114,26 @@ unittest {
     auto sIn1 = arrayInputStreamFor!int(sInData);
     auto bufIn1 = bufferedInputStreamFor(sIn1);
     int[1] buf1;
-    int readResult1 = bufIn1.readFromStream(buf1);
-    assert(readResult1 == 1);
+    StreamResult readResult1 = bufIn1.readFromStream(buf1);
+    assert(readResult1 == StreamResult(1));
     assert(buf1 == [1]);
     int[4] buf2;
-    int readResult2 = bufIn1.readFromStream(buf2);
-    assert(readResult2 == 3);
+    StreamResult readResult2 = bufIn1.readFromStream(buf2);
+    assert(readResult2 == StreamResult(3));
 
     // Check that a read error propagates.
     import streams.primitives : ErrorInputStream;
     auto sIn3 = ErrorInputStream!int();
     auto bufIn3 = BufferedInputStream!(typeof(sIn3), int)(sIn3);
     int[64] buf3;
-    assert(bufIn3.readFromStream(buf3) == -1);
+    assert(bufIn3.readFromStream(buf3).hasError);
 
     // Check that a closed input stream results in reads of 0.
     import streams.primitives : NoOpInputStream;
     auto sIn4 = NoOpInputStream!bool();
     auto bufIn4 = BufferedInputStream!(typeof(sIn4))(sIn4);
     bool[3] buf4;
-    assert(bufIn4.readFromStream(buf4) == 0);
+    assert(bufIn4.readFromStream(buf4) == StreamResult(0));
 }
 
 /** 
@@ -161,7 +161,7 @@ struct BufferedOutputStream(S, E = StreamType!E, uint BufferSize = DEFAULT_BUFFE
      *   buffer = The elements to write.
      * Returns: The number of elements that were written, or -1 in case of error.
      */
-    int writeToStream(E[] buffer) {
+    StreamResult writeToStream(E[] buffer) {
         int elementsWritten = 0;
         uint bufferIndex = 0;
         while (bufferIndex < buffer.length) {
@@ -181,26 +181,25 @@ struct BufferedOutputStream(S, E = StreamType!E, uint BufferSize = DEFAULT_BUFFE
             elementsWritten += elementsToWrite;
 
             if (this.nextIndex == BufferSize) {
-                int result = this.internalFlush();
-                if (result == -1) return -1; // If we detect an error, quit immediately.
+                OptionalStreamError optionalError = this.internalFlush();
+                if (optionalError.present) return StreamResult(optionalError.value); // If we detect an error, quit immediately.
             }
         }
-        return elementsWritten;
+        return StreamResult(elementsWritten);
     }
 
-    private int internalFlush() {
-        int result = this.stream.writeToStream(this.internalBuffer[0 .. this.nextIndex]);
-        if (result != -1) {
-            this.nextIndex = 0;
-        }
-        return result;
+    private OptionalStreamError internalFlush() {
+        StreamResult result = this.stream.writeToStream(this.internalBuffer[0 .. this.nextIndex]);
+        if (result.hasError) return OptionalStreamError(result.error);
+        this.nextIndex = 0;
+        return OptionalStreamError.init;
     }
 
     /** 
      * Manually invokes a flush to the underlying stream.
      */
-    void flushStream() {
-        this.internalFlush();
+    OptionalStreamError flushStream() {
+        return this.internalFlush();
     }
 }
 
@@ -215,13 +214,13 @@ unittest {
     assert(isFlushableStream!(typeof(bufOut1)));
 
     ubyte[5] data = [1, 2, 3, 4, 5];
-    assert(bufOut1.writeToStream(data[0 .. 1]) == 1);
+    assert(bufOut1.writeToStream(data[0 .. 1]) == StreamResult(1));
     assert(sOut1.toArrayRaw().length == 0);
-    assert(bufOut1.writeToStream(data[1 .. 2]) == 1);
+    assert(bufOut1.writeToStream(data[1 .. 2]) == StreamResult(1));
     assert(sOut1.toArrayRaw().length == 0);
-    assert(bufOut1.writeToStream(data[2 .. 4]) == 2);
+    assert(bufOut1.writeToStream(data[2 .. 4]) == StreamResult(2));
     assert(sOut1.toArrayRaw() == [1, 2, 3, 4]);
-    assert(bufOut1.writeToStream(data[4 .. 5]) == 1);
+    assert(bufOut1.writeToStream(data[4 .. 5]) == StreamResult(1));
     assert(sOut1.toArrayRaw().length == 4);
     bufOut1.flushStream();
     assert(sOut1.toArrayRaw() == [1, 2, 3, 4, 5]);

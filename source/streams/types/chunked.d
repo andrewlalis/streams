@@ -1,6 +1,6 @@
 module streams.types.chunked;
 
-import streams.primitives : isByteInputStream, isByteOutputStream, isFlushableStream, isClosableStream;
+import streams.primitives;
 
 /** 
  * An input stream for reading from a chunked-encoded stream of bytes.
@@ -22,8 +22,8 @@ struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
      *   buffer = The buffer to read bytes into.
      * Returns: The number of bytes that were read, or -1 in case of error.
      */
-    int readFromStream(ubyte[] buffer) {
-        if (this.endOfStream) return 0;
+    StreamResult readFromStream(ubyte[] buffer) {
+        if (this.endOfStream) return StreamResult(0);
 
         uint bytesRead = 0;
         uint bufferIndex = 0;
@@ -39,14 +39,14 @@ struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
                 // Keep reading until we reach the first \r\n.
                 while (!(charIdx >= 2 && hexChars[charIdx - 2] == '\r' && hexChars[charIdx - 1] == '\n')) {
                     DataReadResult!char result = dIn.readFromStream!char();
-                    if (result.error.present) return result.error.value.lastStreamResult;
-                    hexChars[charIdx++] = result.value.value;
+                    if (result.hasError) return StreamResult(result.error);
+                    hexChars[charIdx++] = result.value;
                 }
                 Optional!uint chunkSize = readHexString(hexChars[0 .. charIdx - 2]);
-                if (!chunkSize.present) return -1;
+                if (!chunkSize.present) return StreamResult(StreamError("Invalid or missing chunk header size.", -1));
                 if (chunkSize.value == 0) {
                     this.endOfStream = true;
-                    return bytesRead;
+                    return StreamResult(bytesRead);
                 }
                 this.currentChunkSize = chunkSize.value;
                 this.currentChunkIndex = 0;
@@ -55,8 +55,11 @@ struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
             const uint spaceAvailable = cast(uint) buffer.length - bufferIndex;
             uint bytesToRead = bytesAvailable < spaceAvailable ? bytesAvailable : spaceAvailable;
             ubyte[] writableSlice = buffer[bufferIndex .. bufferIndex + bytesToRead];
-            int result = this.stream.readFromStream(writableSlice);
-            if (result != bytesToRead) return -1;
+            StreamResult result = this.stream.readFromStream(writableSlice);
+            if (result.hasError) return result;
+            if (result.bytes != bytesToRead) return StreamResult(StreamError(
+                "Could not read all bytes.", result.bytes
+            ));
             bytesRead += bytesToRead;
             bufferIndex += bytesToRead;
             this.currentChunkIndex += bytesToRead;
@@ -64,12 +67,15 @@ struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
             if (this.currentChunkIndex == this.currentChunkSize) {
                 // Read the trailing \r\n after the chunk is done.
                 ubyte[2] trail;
-                int trailingResult = this.stream.readFromStream(trail);
-                if (trailingResult != 2 || trail[0] != '\r' || trail[1] != '\n') return -1;
+                StreamResult trailingResult = this.stream.readFromStream(trail);
+                if (trailingResult.hasError) return trailingResult;
+                if (trailingResult.bytes != 2 || trail[0] != '\r' || trail[1] != '\n') {
+                    return StreamResult(StreamError("Invalid chunk trailing.", trailingResult.bytes));
+                }
             }
         }
 
-        return bytesRead;
+        return StreamResult(bytesRead);
     }
 }
 
@@ -80,9 +86,9 @@ unittest {
     auto sIn1 = arrayInputStreamFor(sample1);
     auto cIn1 = ChunkedEncodingInputStream!(typeof(sIn1))(sIn1);
     ubyte[1024] buffer1;
-    int result1 = cIn1.readFromStream(buffer1);
-    assert(result1 > 0);
-    assert(buffer1[0 .. result1] == "Wikipedia in \r\nchunks.");
+    StreamResult result1 = cIn1.readFromStream(buffer1);
+    assert(result1.hasBytes && result1.bytes > 0);
+    assert(buffer1[0 .. result1.bytes] == "Wikipedia in \r\nchunks.");
 }
 
 /** 
@@ -99,32 +105,36 @@ struct ChunkedEncodingOutputStream(S) if (isByteOutputStream!S) {
      * Writes a single chunk to the output stream.
      * Params:
      *   buffer = The data to write.
-     * Returns: The number of bytes that were actually written, or -1 in case
-     * of error. Note that this includes the bytes used to transmit the chunk
-     * header and trailer bytes.
+     * Returns: The number of bytes that were written, not including the chunk
+     * header and trailer elements.
      */
-    int writeToStream(ubyte[] buffer) {
-        int headerBytes = this.writeChunkHeader(cast(uint) buffer.length);
-        if (headerBytes < 0) return headerBytes;
-        int bytesWritten = this.writeToStream(buffer);
-        if (bytesWritten < 0) return bytesWritten;
-        if (bytesWritten != buffer.length) return -1;
-        int trailerBytes = this.writeChunkTrailer();
-        if (trailerBytes < 0) return trailerBytes;
-        return headerBytes + bytesWritten + trailerBytes;
+    StreamResult writeToStream(ubyte[] buffer) {
+        StreamResult headerResult = this.writeChunkHeader(cast(uint) buffer.length);
+        if (headerResult.hasError) return headerResult;
+        StreamResult chunkResult = this.writeToStream(buffer);
+        if (chunkResult.hasError) return chunkResult;
+        if (chunkResult.bytes != buffer.length) return StreamResult(StreamError(
+            "Could not write full chunk.",
+            chunkResult.bytes
+        ));
+        StreamResult trailerResult = this.writeChunkTrailer();
+        if (trailerResult.hasError) return trailerResult;
+        return chunkResult;
     }
 
     /** 
      * Flushes the chunked-encoded stream by writing a final zero-size chunk
      * header and footer.
      */
-    void flushStream() {
-        int headerBytes = this.writeChunkHeader(0);
-        assert(headerBytes == 3); // We expect: 0\r\n
-        int trailerBytes = this.writeChunkTrailer();
-        assert(trailerBytes == 2); // We expect: \r\n
+    OptionalStreamError flushStream() {
+        StreamResult headerResult = this.writeChunkHeader(0);
+        if (headerResult.hasError) return OptionalStreamError(headerResult.error);
+        StreamResult trailerResult = this.writeChunkTrailer();
+        if (trailerResult.hasError) return OptionalStreamError(trailerResult.error);
         static if (isFlushableStream!S) {
-            this.stream.flushStream();
+            return this.stream.flushStream();
+        } else {
+            return OptionalStreamError.init;
         }
     }
 
@@ -133,31 +143,39 @@ struct ChunkedEncodingOutputStream(S) if (isByteOutputStream!S) {
      * effectively writing a final zero-size chunk header and footer. Also
      * closes the underlying stream, if possible.
      */
-    void closeStream() {
-        this.flushStream();
+    OptionalStreamError closeStream() {
+        OptionalStreamError flushError = this.flushStream();
+        if (flushError.present) return flushError;
         static if (isClosableStream!S) {
-            this.stream.closeStream();
+            return this.stream.closeStream();
+        } else {
+            return OptionalStreamError.init;
         }
     }
 
-    private int writeChunkHeader(uint size) {
+    private StreamResult writeChunkHeader(uint size) {
         import streams.utils : writeHexString;
 
         char[32] chars;
         uint sizeStrLength = writeHexString(size, chars);
         chars[sizeStrLength] = '\r';
         chars[sizeStrLength + 1] = '\n';
-        int bytesWritten = this.stream.writeToStream(cast(ubyte[]) chars[0 .. sizeStrLength + 2]);
-        if (bytesWritten < 0) return bytesWritten;
-        if (bytesWritten != sizeStrLength + 2) return -1;
-        return bytesWritten;
+        StreamResult writeResult = this.stream.writeToStream(cast(ubyte[]) chars[0 .. sizeStrLength + 2]);
+        if (writeResult.hasError) return writeResult;
+        if (writeResult.bytes != sizeStrLength + 2) return StreamResult(StreamError(
+            "Could not write full chunk header.", writeResult.bytes
+        ));
+        return writeResult;
     }
 
-    private int writeChunkTrailer() {
-        int bytesWritten = this.stream.writeToStream(cast(ubyte[2]) "\r\n");
-        if (bytesWritten < 0) return bytesWritten;
-        if (bytesWritten != 2) return -1;
-        return bytesWritten;
+    private StreamResult writeChunkTrailer() {
+        StreamResult writeResult = this.stream.writeToStream(cast(ubyte[2]) "\r\n");
+        if (writeResult.hasError) return writeResult;
+        if (writeResult.bytes != 2) return StreamResult(StreamError(
+            "Could not write full chunk trailer.",
+            writeResult.bytes
+        ));
+        return writeResult;
     }
 }
 
