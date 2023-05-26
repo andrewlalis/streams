@@ -85,10 +85,10 @@ struct BufferedInputStream(S, E = StreamType!S, uint BufferSize = DEFAULT_BUFFER
         StreamResult result = this.stream.readFromStream(this.internalBuffer);
         if (result.hasError) return result; // Exit right away in case of error.
         this.nextIndex = 0;
-        if (result.bytes < BufferSize) {
+        if (result.count < BufferSize) {
             this.streamEnded = true;
         }
-        this.elementsInBuffer = result.bytes;
+        this.elementsInBuffer = result.count;
         return result;
     }
 }

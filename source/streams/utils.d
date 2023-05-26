@@ -63,25 +63,27 @@ struct Either(A, string NameA, B, string NameB) if (!is(A == B)) {
         this.hasA = false;
     }
 
-    A opDispatch(string member)() const if (member == NameA) {
+    A opDispatch(string member)() if (member == NameA) {
         return this.u.a;
     }
 
-    B opDispatch(string member)() const if (member == NameB) {
+    B opDispatch(string member)() if (member == NameB) {
         return this.u.b;
     }
 
     bool opDispatch(string member)() const if (member.length > 3 && member[0 .. 3] == "has") {
         const string suffix = member[3 .. $];
+        const suffixA = formatPascal(NameA);
+        const suffixB = formatPascal(NameB);
 
-        static if (suffix == formatPascal(NameA)) {
+        static if (suffix == suffixA) {
             return this.hasA;
-        } else static if (suffix == formatPascal(NameB)) {
+        } else static if (suffix == suffixB) {
             return !this.hasA;
         } else {
             static assert(
                 false,
-                "Invalid member. Expected \"has" ~ formatPascal(NameA) ~ "\" or \"has" ~ formatPascal(NameB) ~ "\"."
+                "Invalid member. Expected \"has" ~ suffixA ~ "\" or \"has" ~ suffixB ~ "\"."
             );
         }
     }

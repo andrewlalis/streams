@@ -122,11 +122,11 @@ struct DataInputStream(S) if (isByteInputStream!S) {
         U u;
         StreamResult readResult = this.stream.readFromStream(u.bytes[]);
         if (readResult.hasError) return DataReadResult!T(readResult.error);
-        if (readResult.bytes != T.sizeof) {
+        if (readResult.count != T.sizeof) {
             return DataReadResult!T(StreamError(
                 "Failed to read scalar value of type \"" ~ T.stringof ~ "\"" ~
                 " from stream of type \"" ~ S.stringof ~ "\".",
-                readResult.bytes
+                readResult.count
             ));
         }
         ensureByteOrder!T(u.bytes, SYSTEM_ENDIANNESS, this.endianness);
@@ -222,11 +222,11 @@ struct DataOutputStream(S) if (isByteOutputStream!S) {
         ensureByteOrder!T(u.bytes, this.endianness, SYSTEM_ENDIANNESS);
         StreamResult writeResult = this.stream.writeToStream(u.bytes[]);
         if (writeResult.hasError) return OptionalStreamError(writeResult.error);
-        if (writeResult.bytes != T.sizeof) {
+        if (writeResult.count != T.sizeof) {
             return OptionalStreamError(StreamError(
                 "Failed to write scalar value of type \"" ~ T.stringof ~ "\"" ~
                 " to stream of type \"" ~ S.stringof ~ "\".",
-                writeResult.bytes
+                writeResult.count
             ));
         }
         return OptionalStreamError.init;

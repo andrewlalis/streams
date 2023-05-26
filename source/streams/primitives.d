@@ -53,10 +53,10 @@ struct StreamError {
 alias OptionalStreamError = Optional!StreamError;
 
 /**
- * Either a number of bytes that have been read or written, or a stream error,
+ * Either a number of items that have been read or written, or a stream error,
  * as a common result type for many stream operations.
  */
-alias StreamResult = Either!(uint, "bytes", StreamError, "error");
+alias StreamResult = Either!(uint, "count", StreamError, "error");
 
 /** 
  * Determines if the given template argument is some form of input stream,

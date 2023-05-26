@@ -26,7 +26,7 @@ struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
     void popFront() {
         E[1] buffer;
         this.lastRead = this.stream.readFromStream(buffer);
-        if (this.lastRead.hasBytes && this.lastRead.bytes > 0) {
+        if (this.lastRead.hasCount && this.lastRead.count > 0) {
             this.lastElement = Optional!E(buffer[0]);
         } else {
             this.lastElement = Optional!E.init;
@@ -34,7 +34,7 @@ struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
     }
 
     bool empty() {
-        return !this.lastRead.hasBytes || this.lastRead.bytes == 0;
+        return !this.lastRead.hasCount || this.lastRead.count == 0;
     }
 
     E front() {
