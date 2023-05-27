@@ -89,22 +89,30 @@ Either!(E[], "data", StreamError, "error") readAll(S, E = StreamType!S, uint Buf
 unittest {
     import streams.types.array;
     import core.stdc.stdlib : free;
+    import std.stdio;
+
+    writeln("Starting test 1");
     ubyte[12] data1 = cast(ubyte[12]) "Hello world!";
     auto sIn1 = arrayInputStreamFor(data1);
     auto result = readAll(sIn1);
     assert(result.hasData);
     assert(result.data == "Hello world!");
     free(result.data.ptr);
+    writeln("Test 1 complete.");
 
-    // int[1_000_000] data2;
-    // for (uint i = 0; i < 1_000_000; i++) {
-    //     data2[i] = i > 0 ? i - data2[i - 1] : i;
-    // }
-    // auto sIn2 = arrayInputStreamFor(data2);
-    // auto result2 = readAll(sIn2);
-    // assert(result2.hasData);
-    // assert(result2.data.length == 1_000_000);
-    // free(result2.data.ptr);
+    writeln("Starting test 2");
+    int[1_000_000] data2;
+    for (uint i = 0; i < 1_000_000; i++) {
+        data2[i] = i > 0 ? i - data2[i - 1] : i;
+    }
+    auto sIn2 = arrayInputStreamFor(data2);
+    writeln("calling readAll()");
+    auto result2 = readAll(sIn2);
+    writeln("readAll() completed.");
+    assert(result2.hasData);
+    assert(result2.data.length == 1_000_000);
+    free(result2.data.ptr);
+    writeln("Test 2 complete.");
 
     // Check that errors result in an error.
     // auto sIn3 = ErrorInputStream!bool();
