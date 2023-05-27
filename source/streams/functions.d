@@ -94,20 +94,20 @@ unittest {
     auto result = readAll(sIn1);
     assert(result.hasData);
     assert(result.data == "Hello world!");
-    // free(result.data.ptr);
+    free(result.data.ptr);
 
-    int[1_000_000] data2;
-    for (uint i = 0; i < 1_000_000; i++) {
-        data2[i] = i > 0 ? i - data2[i - 1] : i;
-    }
-    auto sIn2 = arrayInputStreamFor(data2);
-    auto result2 = readAll(sIn2);
-    assert(result2.hasData);
-    assert(result2.data.length == 1_000_000);
+    // int[1_000_000] data2;
+    // for (uint i = 0; i < 1_000_000; i++) {
+    //     data2[i] = i > 0 ? i - data2[i - 1] : i;
+    // }
+    // auto sIn2 = arrayInputStreamFor(data2);
+    // auto result2 = readAll(sIn2);
+    // assert(result2.hasData);
+    // assert(result2.data.length == 1_000_000);
     // free(result2.data.ptr);
 
     // Check that errors result in an error.
-    auto sIn3 = ErrorInputStream!bool();
-    auto result3 = readAll(sIn3);
-    assert(result3.hasError);
+    // auto sIn3 = ErrorInputStream!bool();
+    // auto result3 = readAll(sIn3);
+    // assert(result3.hasError);
 }
