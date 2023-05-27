@@ -1,5 +1,7 @@
 /** 
- * Object-oriented interfaces and classes for dealing with streams.
+ * Object-oriented interfaces and classes for dealing with streams. The symbols
+ * defined in this module are only available when not in "BetterC" mode, as
+ * they require the use of the Garbage Collector.
  */
 module streams.interfaces;
 
@@ -39,6 +41,10 @@ interface OutputStream(E) {
  * Interface defining a stream that is closable.
  */
 interface ClosableStream {
+    /** 
+     * Closes the stream.
+     * Returns: An optional stream error, if closing the stream fails.
+     */
     OptionalStreamError closeStream();
 }
 
@@ -46,6 +52,10 @@ interface ClosableStream {
  * Interface defining a stream that is flushable.
  */
 interface FlushableStream {
+    /** 
+     * Flushes the stream.
+     * Returns: An optional stream error, if flushing the stream fails.
+     */
     OptionalStreamError flushStream();
 }
 
@@ -55,10 +65,23 @@ interface FlushableStream {
 class InputStreamWrapper(S, E = StreamType!S) : InputStream!E if (isInputStream!(S, E)) {
     private S* stream;
 
+    /**
+     * Constructs the input stream wrapper with a reference to a primitive
+     * input stream.
+     * Params:
+     *   stream = The stream to wrap in an object-oriented stream.
+     */
     this(ref S stream) {
         this.stream = &stream;
     }
 
+    /** 
+     * Reads up to `buffer.length` elements from the wrapped input stream, and
+     * writes them to `buffer`.
+     * Params:
+     *   buffer = The buffer to read elements into.
+     * Returns: Either the number of elements read, or a stream error.
+     */
     StreamResult readFromStream(E[] buffer) {
         return this.stream.readFromStream(buffer);
     }
@@ -81,10 +104,22 @@ InputStreamWrapper!(S, E) inputStreamWrapperFor(S, E = StreamType!S)(ref S strea
 class OutputStreamWrapper(S, E = StreamType!S) : OutputStream!E if (isOutputStream!(S, E)) {
     private S* stream;
 
+    /**
+     * Constructs the output stream wrapper with a reference to a primitive
+     * output stream.
+     * Params:
+     *   stream = The stream to wrap in an object-oriented stream.
+     */
     this(ref S stream) {
         this.stream = &stream;
     }
 
+    /**
+     * Writes up to `buffer.length` elements to the wrapped output stream.
+     * Params:
+     *   buffer = The buffer to write elements from.
+     * Returns: Either the number of elements written, or a stream error.
+     */
     StreamResult writeToStream(E[] buffer) {
         return this.stream.writeToStream(buffer);
     }

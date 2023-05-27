@@ -1,6 +1,6 @@
 /** 
  * Defines input and output streams for reading and writing files using C's
- * stdio functions as a basis.
+ * stdio functions like `fopen`, `fread`, and `fwrite` as a basis.
  */
 module streams.types.file;
 
@@ -15,15 +15,32 @@ import core.stdc.stdio : fopen, fclose, fread, fwrite, fflush, feof, ferror, FIL
 struct FileInputStream {
     private FILE* filePtr;
 
+    /**
+     * Constructs an input stream to read from the given file pointer.
+     * Params:
+     *   filePtr = The file pointer. It should not be null, and should refer to
+     *             a file opened with `fopen` in `rb` mode.
+     */
     this(FILE* filePtr) {
         assert(filePtr !is null);
         this.filePtr = filePtr;
     }
 
+    /** 
+     * Constructs an input stream to read from the given file.
+     * Params:
+     *   filename = The filename to open.
+     */
     this(const(char*) filename) {
         this(fopen(filename, "rb"));
     }
 
+    /** 
+     * Reads up to `buffer.length` bytes from the file.
+     * Params:
+     *   buffer = The buffer to read into.
+     * Returns: The number of bytes that were read, or an error if `fread` fails.
+     */
     StreamResult readFromStream(ubyte[] buffer) {
         if (this.filePtr is null) {
             return StreamResult(StreamError("File is not open.", -1));
@@ -35,9 +52,17 @@ struct FileInputStream {
         return StreamResult(cast(uint) bytesRead);
     }
 
+    /** 
+     * Closes the file stream by calling `fclose` on the underlying file
+     * pointer.
+     * Returns: An optional stream error if `fclose` fails.
+     */
     OptionalStreamError closeStream() {
         if (this.filePtr !is null) {
-            fclose(this.filePtr);
+            int result = fclose(this.filePtr);
+            if (result != 0) {
+                return OptionalStreamError(StreamError("Could not close the file.", result)); // cov-ignore
+            }
             this.filePtr = null;
         }
         return OptionalStreamError.init;
@@ -90,15 +115,32 @@ unittest {
 struct FileOutputStream {
     private FILE* filePtr;
 
+    /**
+     * Constructs an output stream to write to the given file pointer.
+     * Params:
+     *   filePtr = The file pointer. It should not be null, and it should refer
+     *             to a file opened by `fopen` in `wb` mode.
+     */
     this(FILE* filePtr) {
         assert(filePtr !is null);
         this.filePtr = filePtr;
     }
 
+    /** 
+     * Constructs an output stream to write to the given file.
+     * Params:
+     *   filename = The name of the file to write to.
+     */
     this(const(char*) filename) {
         this(fopen(filename, "wb"));
     }
 
+    /**
+     * Writes up to `buffer.length` bytes to the file.
+     * Params:
+     *   buffer = The bytes to write.
+     * Returns: A result that's either `buffer.length` or an error.
+     */
     StreamResult writeToStream(ubyte[] buffer) {
         if (this.filePtr is null) {
             return StreamResult(StreamError("File is not open.", -1));
@@ -110,16 +152,26 @@ struct FileOutputStream {
         return StreamResult(cast(uint) bytesWritten);
     }
 
+    /** 
+     * Flushes the file to the disk.
+     * Returns: An optional stream error if `fflush` fails.
+     */
     OptionalStreamError flushStream() {
         if (this.filePtr !is null) {
-            fflush(this.filePtr);
+            int result = fflush(this.filePtr);
+            if (result != 0) return OptionalStreamError(StreamError("Could not flush the file.", result));
         }
         return OptionalStreamError.init;
     }
 
+    /**
+     * Closes the file.
+     * Returns: An optional stream error if `fclose` fails.
+     */
     OptionalStreamError closeStream() {
         if (this.filePtr !is null) {
-            fclose(this.filePtr);
+            int result = fclose(this.filePtr);
+            if (result != 0) return OptionalStreamError(StreamError("Could not close the file.", result));
             this.filePtr = null;
         }
         return OptionalStreamError.init;

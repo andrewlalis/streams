@@ -8,14 +8,30 @@ module streams.utils;
  * present.
  */
 struct Optional(T) {
+    /** 
+     * Whether the value is present.
+     */
     bool present = false;
+
+    /** 
+     * The value that's present, if any.
+     */
     T value = T.init;
 
+    /** 
+     * Constructs an optional with a given value.
+     * Params:
+     *   value = The value to use.
+     */
     this(T value) {
         this.present = true;
         this.value = value;
     }
 
+    /** 
+     * Determines if a value is not present.
+     * Returns: True if the value is not present.
+     */
     bool notPresent() const {
         return !this.present;
     }
@@ -40,6 +56,9 @@ unittest {
  * will allow you to call `s.first`, `s.second`, `s.hasFirst`, and `s.hasSecond`.
  */
 struct Either(A, string NameA, B, string NameB) if (!is(A == B)) {
+    private enum checkA = "has" ~ (NameA[0] - ('a' - 'A')) ~ NameA[1 .. $];
+    private enum checkB = "has" ~ (NameB[0] - ('a' - 'A')) ~ NameB[1 .. $];
+
     union U {
         A a;
         B b;
@@ -71,21 +90,12 @@ struct Either(A, string NameA, B, string NameB) if (!is(A == B)) {
         return this.u.b;
     }
 
-    bool opDispatch(string member)() const if (member.length > 3 && member[0 .. 3] == "has") {
-        const string suffix = member[3 .. $];
-        const suffixA = formatPascal(NameA);
-        const suffixB = formatPascal(NameB);
+    bool opDispatch(string member)() const if (member == checkA) {
+        return this.hasA;
+    }
 
-        static if (suffix == suffixA) {
-            return this.hasA;
-        } else static if (suffix == suffixB) {
-            return !this.hasA;
-        } else {
-            static assert(
-                false,
-                "Invalid member. Expected \"has" ~ suffixA ~ "\" or \"has" ~ suffixB ~ "\"."
-            );
-        }
+    bool opDispatch(string member)() const if (member == checkB) {
+        return !this.hasA;
     }
 
     bool has(string member)() const if (member == NameA || member == NameB) {
@@ -118,22 +128,6 @@ unittest {
     assert(e2.second == 3);
 }
 
-private string formatPascal(string s) {
-    if (s.length == 0) return s;
-    const char diff = 'a' - 'A';
-    if (s[0] >= 'a' && s[0] <= 'z') {
-        return cast(char) (s[0] - diff) ~ s[1 .. $];
-    } else {
-        return s;
-    }
-}
-
-unittest {
-    assert(formatPascal("hello") == "Hello");
-    assert(formatPascal("123Testing") == "123Testing");
-    assert(formatPascal("helloWorld!") == "HelloWorld!");
-}
-
 /** 
  * A strategy for how to grow a buffer as items are added, used by the AppendableBuffer.
  */
@@ -144,7 +138,7 @@ enum BufferAllocationStrategy { Linear, Doubling, None }
  * elements.
  */
 struct AppendableBuffer(T) {
-    import std.stdio;
+    // import std.stdio;
     import core.stdc.stdlib : malloc, realloc, free;
 
     private T* ptr;
@@ -168,7 +162,7 @@ struct AppendableBuffer(T) {
     }
 
     ~this() {
-        writeln("Freeing appendable buffer");
+        // writeln("Freeing appendable buffer");
         if (this.ptr !is null) {
             free(this.ptr);
         }
@@ -180,7 +174,7 @@ struct AppendableBuffer(T) {
      *   items = The items to add.
      */
     void appendItems(T[] items) {
-        writefln!"Appending %d items"(items.length);
+        // writefln!"Appending %d items"(items.length);
         if (this.ptr is null) reset();
 
         uint len = cast(uint) items.length;
@@ -223,7 +217,7 @@ struct AppendableBuffer(T) {
      * Resets the buffer.
      */
     void reset() {
-        writeln("Resetting appendable buffer");
+        // writeln("Resetting appendable buffer");
         if (this.ptr !is null) {
             free(this.ptr);
         }
@@ -237,7 +231,7 @@ struct AppendableBuffer(T) {
 
     private void ensureCapacityFor(uint count) {
         while ((this.capacity - this.nextIndex) < count) {
-            writefln!"Ensuring capacity for %d new items"(count);
+            // writefln!"Ensuring capacity for %d new items"(count);
             uint newCapacity;
             final switch (this.allocationStrategy) {
                 case BufferAllocationStrategy.Linear:
@@ -249,7 +243,7 @@ struct AppendableBuffer(T) {
                 case BufferAllocationStrategy.None:
                     assert(false, "Cannot allocate more space to appendable buffer using None strategy.");
             }
-            writeln("Reallocating pointer");
+            // writeln("Reallocating pointer");
             T* newPtr = cast(T*) realloc(this.ptr, newCapacity * T.sizeof);
             if (newPtr is null) {
                 free(this.ptr); // Can't test this without mocking realloc... cov-ignore
@@ -257,7 +251,7 @@ struct AppendableBuffer(T) {
             }
             this.ptr = newPtr;
             this.capacity = newCapacity;
-            writefln!"New capacity: %d"(this.capacity);
+            // writefln!"New capacity: %d"(this.capacity);
         }
     }
 }

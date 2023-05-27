@@ -6,12 +6,12 @@
  * 
  * ${B Input streams} are defined by the presence of a read function:
  * ```d
- * int readFromStream(DataType[] buffer)
+ * StreamResult readFromStream(DataType[] buffer)
  * ```
  *
  * ${B Output streams} are defined by the presence of a write function:
  * ```d
- * int writeToStream(DataType[] buffer)
+ * StreamResult writeToStream(DataType[] buffer)
  * ```
  *
  * Usually these functions can be used as [Template Constraints](https://dlang.org/spec/template.html#template_constraints)
@@ -19,8 +19,10 @@
  * ```d
  * void useBytes(S)(S stream) if (isInputStream!(S, ubyte)) {
  *     ubyte[8192] buffer;
- *     int bytesRead = stream.readFromStream(buffer);
- *     // Do something with the data.
+ *     StreamResult result = stream.readFromStream(buffer);
+ *     if (!result.hasError) {
+ *       // Do something with the data.
+ *     }
  * }
  * ```
  */
@@ -55,16 +57,17 @@ alias OptionalStreamError = Optional!StreamError;
 /**
  * Either a number of items that have been read or written, or a stream error,
  * as a common result type for many stream operations.
+ *
+ * As an instance of `Either`, it offers the following methods:
+ * - `result.hasError` to check if the result has an error.
+ * - `result.hasCount` to check if the result has an element count.
+ * - `result.error` to get the `StreamError` instance, if `result.hasError` returns `true`.
+ * - `result.count` to get the number of elements read or written, if `result.hasCount` returns `true`.
  */
 alias StreamResult = Either!(uint, "count", StreamError, "error");
 
 /** 
- * Determines if the given template argument is some form of input stream,
- * where an input stream is anything with a read method that takes a single
- * array parameter, and returns an integer number of elements that were read,
- * or -1 in case of error. This method does not care about the type of elements
- * that can be read by the stream.
- *
+ * Determines if the given template argument is some form of input stream.
  * Returns: `true` if the given argument is an input stream type.
  */
 bool isSomeInputStream(StreamType)() {
@@ -116,12 +119,7 @@ unittest {
 }
 
 /** 
- * Determines if the given template argument is some form of output stream,
- * where an output stream is anything with a `write` method that takes a single
- * array parameter, and returns an integer number of elements that were read,
- * or -1 in case of error. This method does not care about the type of elements
- * that can be read by the stream.
- *
+ * Determines if the given template argument is some form of output stream.
  * Returns: `true` if the given argument is an output stream type.
  */
 bool isSomeOutputStream(StreamType)() {
@@ -300,7 +298,8 @@ unittest {
 /** 
  * Determines if the given stream type is an input or output stream for data of
  * the given type.
- * Returns: `true` if the stream type is an input or output stream for the given data type.
+ * Returns: `true` if the stream type is an input or output stream for the
+ * given data type.
  */
 bool isSomeStream(StreamType, DataType)() {
     return isInputStream!(StreamType, DataType) || isOutputStream(StreamType, DataType);
@@ -324,8 +323,9 @@ bool isByteOutputStream(StreamType)() {
 
 /** 
  * Determines if the given template argument is a closable stream type, which
- * defines a `void closeStream()` method as a means to close and/or deallocate
- * the underlying resource that the stream reads from or writes to.
+ * defines a `Optional!StreamError closeStream()` method as a means to close
+ * and/or deallocate the underlying resource that the stream reads from or
+ * writes to.
  *
  * Returns: `true` if the given argument is a closable stream.
  */
@@ -365,10 +365,10 @@ unittest {
 
 /** 
  * Determines if the given template argument is a flushable stream type, which
- * is any output stream that defines a `void flushStream()` method, which should
- * cause any data buffered by the stream or its resources to be flushed. The
- * exact nature of how a flush operates is implementation-dependent.
- *
+ * is any output stream that defines a `Optional!StreamError flushStream()`
+ * method, which should cause any data buffered by the stream or its resources
+ * to be flushed. The exact nature of how a flush operates is implementation-
+ * dependent.
  * Returns: `true` if the given argument is a flushable stream.
  */
 bool isFlushableStream(S)() {
@@ -407,9 +407,9 @@ unittest {
 
 /** 
  * Determines if the given template argument is a seekable stream type, which
- * is any stream, input or output, that defines a `seekInStream()` method that
- * causes the stream to seek to a particular location in the underlying
- * resource so that the next stream operation takes place from that location.
+ * is any stream, input or output, that defines a `Optional!StreamError seekInStream(ulong offset)`
+ * function for seeking to a particular position in a stream, specified by the
+ * `offset` in terms of elements.
  * Returns: `true` if the given argument is a seekable stream.
  */
 bool isSeekableStream(S)() {
@@ -420,7 +420,10 @@ bool isSeekableStream(S)() {
     ) {
         alias seekFunction = __traits(getMember, S, SEEKABLE_STREAM_METHOD);
         alias params = Parameters!seekFunction;
-        return (is(ReturnType!seekFunction == void) && params.length == 0);
+        return (
+            is(ReturnType!seekFunction == OptionalStreamError) &&
+            params.length == 1 && is(params[0] == ulong)
+        );
     } else {
         return false;
     }
@@ -430,6 +433,12 @@ bool isSeekableStream(S)() {
  * An input stream that always reads 0 elements.
  */
 struct NoOpInputStream(T) {
+    /** 
+     * Reads zero elements.
+     * Params:
+     *   buffer = A buffer.
+     * Returns: Always 0.
+     */
     StreamResult readFromStream(T[] buffer) {
         return StreamResult(0);
     }
@@ -439,24 +448,42 @@ struct NoOpInputStream(T) {
  * An output stream that always writes 0 elements.
  */
 struct NoOpOutputStream(T) {
+    /** 
+     * Writes zero elements.
+     * Params:
+     *   buffer = A buffer.
+     * Returns: Always 0.
+     */
     StreamResult writeToStream(T[] buffer) {
         return StreamResult(0);
     }
 }
 
 /** 
- * An input stream that always returns a -1 error response.
+ * An input stream that always returns an error response.
  */
 struct ErrorInputStream(T) {
+    /**
+     * Always emits an error response when called.
+     * Params:
+     *   buffer = A buffer.
+     * Returns: A stream error.
+     */
     StreamResult readFromStream(T[] buffer) {
         return StreamResult(StreamError("An error occurred.", -1));
     }
 }
 
 /** 
- * An output stream that always returns a -1 error response.
+ * An output stream that always returns an error response.
  */
 struct ErrorOutputStream(T) {
+    /**
+     * Always emits an error response when called.
+     * Params:
+     *   buffer = A buffer.
+     * Returns: A stream error.
+     */
     StreamResult writeToStream(T[] buffer) {
         return StreamResult(StreamError("An error occurred.", -1));
     }

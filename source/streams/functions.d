@@ -96,8 +96,6 @@ unittest {
     assert(result.hasData);
     free(result.data.ptr);
 
-    import std.stdio;
-    writeln("FUNC_TEST");
     const size = 10_000;
     int[size] data2;
     for (uint i = 0; i < size; i++) {
@@ -108,7 +106,6 @@ unittest {
     assert(result2.hasData);
     assert(result2.data.length == size);
     free(result2.data.ptr);
-    writeln("FUNC_TEST_DONE");
 
     // Check that errors result in an error.
     auto sIn3 = ErrorInputStream!bool();

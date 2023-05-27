@@ -8,6 +8,9 @@ module streams;
 public import streams.primitives;
 public import streams.functions;
 public import streams.types;
-public import streams.interfaces;
 public import streams.range;
 public import streams.utils;
+
+version (D_BetterC) {} else {
+    public import streams.interfaces;
+}

@@ -17,12 +17,21 @@ struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
     private Optional!E lastElement;
     private StreamResult lastRead;
 
+    /** 
+     * Constructs this range using a reference to a stream.
+     * Params:
+     *   stream = The input stream to read from.
+     */
     this(ref S stream) {
         this.stream = &stream;
         // Initialize the range with one element.
         this.popFront();
     }
 
+    /** 
+     * Pops the last-read element from the stream, and buffers the next one so
+     * that calling `front()` will return the next element.
+     */
     void popFront() {
         E[1] buffer;
         this.lastRead = this.stream.readFromStream(buffer);
@@ -33,10 +42,19 @@ struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
         }
     }
 
+    /** 
+     * Determines if the stream is empty. We consider a stream as empty when
+     * reading from it returns a result of 0 elements.
+     * Returns: `true` if the underlying stream is empty.
+     */
     bool empty() {
         return !this.lastRead.hasCount || this.lastRead.count == 0;
     }
 
+    /** 
+     * Gets the last-read element from the stream.
+     * Returns: The last-read element from the stream.
+     */
     E front() {
         return this.lastElement.value;
     }
@@ -47,15 +65,7 @@ struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
  * input stream compatible with functions that take input ranges. The given
  * stream is stored as a pointer in the underlying range implementation, so you
  * should still manage ownership of the original stream.
- * 
- * ```d
- * import std.range.primitives : isInputRange;
- * import streams;
  *
- * auto stream = inputStreamFor!int([1, 2, 3]);
- * auto range = asInputRange!int(stream);
- * assert(isInputRange!(typeof(range)));
- * ```
  * Params:
  *   stream = The stream to wrap.
  * Returns: The input range.
@@ -88,6 +98,12 @@ unittest {
 struct InputRangeStream(R, E = ElementType!R) if (isInputRange!R) {
     private R range;
 
+    /**
+     * Pops elements from the underlying input range to fill `buffer`.
+     * Params:
+     *   buffer = The buffer to fill.
+     * Returns: The number of items that were read.
+     */
     StreamResult readFromStream(E[] buffer) {
         int readCount = 0;
         while (readCount < buffer.length && !this.range.empty()) {
@@ -109,23 +125,19 @@ auto asInputStream(R, E = ElementType!R)(R range) if (isInputRange!R) {
     return InputRangeStream!(R, E)(range);
 }
 
-// TODO: Fix these tests!!!
-// unittest {
-//     int[6] r = [1, 2, 3, 4, 5, 6];
-//     auto s = asInputStream(r[]);
-//     int[4] buffer;
-//     assert(s.readFromStream(buffer) == 4);
-//     assert(buffer == [1, 2, 3, 4]);
-
-//     auto s2 = asInputStream("Hello world");
-//     dchar[4] buffer2;
-//     assert(s2.readFromStream(buffer2) == 4);
-//     assert(buffer2 == "Hell");
-//     assert(s2.readFromStream(buffer2) == 4);
-//     assert(buffer2 == "o wo");
-//     assert(s2.readFromStream(buffer2) == 3);
-//     assert(buffer2 == "rldo");
-// }
+unittest {
+    float[5] inputRange = [0.25, 0.5, 0.75, 1.0, 1.25];
+    auto inputStream = asInputStream(inputRange[]);
+    float[2] buffer = [0, 0];
+    StreamResult result = inputStream.readFromStream(buffer);
+    assert(result.hasCount && result.count == 2);
+    result = inputStream.readFromStream(buffer);
+    assert(result.hasCount && result.count == 2);
+    result = inputStream.readFromStream(buffer);
+    assert(result.hasCount && result.count == 1);
+    result = inputStream.readFromStream(buffer);
+    assert(result.hasCount && result.count == 0);
+}
 
 /** 
  * A struct that, when initialized with an output stream, acts as a Phobos-
@@ -134,26 +146,23 @@ auto asInputStream(R, E = ElementType!R)(R range) if (isInputRange!R) {
 struct OutputStreamRange(S, E = StreamType!S) if (isOutputStream!(S, E)) {
     private S* stream;
     
+    /**
+     * Writes all elements in `buffer` to the underlying stream.
+     * Params:
+     *   buffer = The buffer of elements to write.
+     */
     void put(E[] buffer) {
         this.stream.writeToStream(buffer);
     }
 }
 
-/** 
+/**
  * Wraps an existing output stream as a Phobos-style output range with a
  * `put` method, to make any output stream compatible with functions that take
  * output ranges. The given stream is stored as a pointer in the underlying
  * range implementation, so you should still manage ownership of the original
  * stream.
- * 
- * ```d
- * import std.range.primitives : isOutputRange;
- * import streams;
  *
- * auto stream = ArrayOutputStream!int();
- * auto range = asOutputRange!int(stream);
- * assert(isOutputRange!(typeof(range), int));
- * ```
  * Params:
  *   stream = The stream to wrap.
  * Returns: The output range.
@@ -179,6 +188,13 @@ unittest {
 struct OutputRangeStream(R, E = ElementType!R) if (isOutputRange!(R, E)) {
     private R range;
 
+    /**
+     * Writes the elements in `buffer` to the underlying output range.
+     * Params:
+     *   buffer = The buffer of elements to write.
+     * Returns: Always the number of elements in `buffer`. If the underlying
+     * range throws an exception, this will be thrown by this stream.
+     */
     StreamResult writeToStream(E[] buffer) {
         this.range.put(buffer);
         return StreamResult(cast(uint) buffer.length);
@@ -211,7 +227,7 @@ unittest {
  * Converts the given range to a stream. Input ranges are converted to input
  * streams, and output ranges are converted to output streams. Note that if
  * the given range is both an input and an output range, an input stream is
- * returned.
+ * returned. Use `asInputStream` and `asOutputStream` to choose explicitly.
  * Params:
  *   range = The range to convert.
  * Returns: A stream that wraps the given range.
