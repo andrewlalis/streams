@@ -144,6 +144,7 @@ enum BufferAllocationStrategy { Linear, Doubling, None }
  * elements.
  */
 struct AppendableBuffer(T) {
+    import std.stdio;
     import core.stdc.stdlib : malloc, realloc, free;
 
     private T* ptr;
@@ -167,6 +168,7 @@ struct AppendableBuffer(T) {
     }
 
     ~this() {
+        writeln("Freeing appendable buffer");
         if (this.ptr !is null) {
             free(this.ptr);
         }
@@ -178,6 +180,7 @@ struct AppendableBuffer(T) {
      *   items = The items to add.
      */
     void appendItems(T[] items) {
+        writefln!"Appending %d items"(items.length);
         if (this.ptr is null) reset();
 
         uint len = cast(uint) items.length;
@@ -220,6 +223,7 @@ struct AppendableBuffer(T) {
      * Resets the buffer.
      */
     void reset() {
+        writeln("Resetting appendable buffer");
         if (this.ptr !is null) {
             free(this.ptr);
         }
@@ -233,6 +237,7 @@ struct AppendableBuffer(T) {
 
     private void ensureCapacityFor(uint count) {
         while ((this.capacity - this.nextIndex) < count) {
+            writefln!"Ensuring capacity for %d new items"(count);
             uint newCapacity;
             final switch (this.allocationStrategy) {
                 case BufferAllocationStrategy.Linear:
@@ -244,6 +249,7 @@ struct AppendableBuffer(T) {
                 case BufferAllocationStrategy.None:
                     assert(false, "Cannot allocate more space to appendable buffer using None strategy.");
             }
+            writeln("Reallocating pointer");
             T* newPtr = cast(T*) realloc(this.ptr, newCapacity * T.sizeof);
             if (newPtr is null) {
                 free(this.ptr); // Can't test this without mocking realloc... cov-ignore
@@ -251,6 +257,7 @@ struct AppendableBuffer(T) {
             }
             this.ptr = newPtr;
             this.capacity = newCapacity;
+            writefln!"New capacity: %d"(this.capacity);
         }
     }
 }
