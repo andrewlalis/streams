@@ -60,6 +60,12 @@ unittest {
     s1.reset();
     assert(s1.readFromStream(buffer) == StreamResult(2));
     assert(buffer == [1, 2]);
+    // Test that the stream works for a single buffer.
+    int[1] singleBuffer;
+    assert(s1.readFromStream(singleBuffer) == StreamResult(1));
+    assert(singleBuffer[0] == 3);
+    assert(s1.readFromStream(singleBuffer) == StreamResult(1));
+    assert(singleBuffer[0] == 4);
 }
 
 /** 

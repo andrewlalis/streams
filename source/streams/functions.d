@@ -112,3 +112,72 @@ unittest {
     auto result3 = readAll(sIn3);
     assert(result3.hasError);
 }
+
+/**
+ * Reads exactly one element from an input stream.
+ * Params:
+ *   stream = The stream to read one element from.
+ * Returns: Either the element, or an error.
+ */
+Either!(T, "element", StreamError, "error") readOne(S, T = StreamType!S)(ref S stream) if (isSomeInputStream!S) {
+    T[1] buffer;
+    StreamResult result = stream.readFromStream(buffer);
+    if (result.hasError) return Either!(T, "element", StreamError, "error")(result.error);
+    if (result.count != 1) return Either!(T, "element", StreamError, "error")(StreamError(
+        "Did not read exactly 1 element.",
+        result.count
+    ));
+    return Either!(T, "element", StreamError, "error")(buffer[0]);
+}
+
+unittest {
+    import streams.types.array;
+
+    ubyte[12] data1 = cast(ubyte[12]) "Hello world!";
+    auto sIn1 = arrayInputStreamFor(data1);
+
+    auto result = readOne(sIn1);
+    assert(result.hasElement);
+    assert(result.element == 'H');
+    
+    result = readOne(sIn1);
+    assert(result.hasElement);
+    assert(result.element == 'e');
+    for (uint i = 0; i < 10; i++) {
+        result = readOne(sIn1);
+        assert(!result.hasError);
+        assert(result.element == data1[i + 2]);
+    }
+    // Check that reading after we've exhausted the stream returns an error.
+    result = readOne(sIn1);
+    assert(result.hasError);
+}
+
+/** 
+ * Writes exactly one element to an output stream.
+ * Params:
+ *   stream = The stream to write one element to.
+ *   value = The value to write.
+ * Returns: An optional stream error, which is present if writing failed.
+ */
+OptionalStreamError writeOne(S, T = StreamType!S)(ref S stream, T value) if (isSomeOutputStream!S) {
+    T[1] buffer = [value];
+    StreamResult result = stream.writeToStream(buffer);
+    if (result.hasError) return OptionalStreamError(result.error);
+    if (result.count != 1) return OptionalStreamError(StreamError(
+        "Did not write exactly 1 element.",
+        result.count
+    ));
+    return OptionalStreamError.init;
+}
+
+unittest {
+    import streams.types.array;
+
+    auto sOut1 = arrayOutputStreamFor!int();
+    assert(writeOne(sOut1, 42).notPresent);
+    assert(sOut1.toArrayRaw() == [42]);
+
+    auto sOut2 = ErrorOutputStream!bool();
+    assert(writeOne(sOut2, false).present);
+}
