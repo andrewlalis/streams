@@ -58,6 +58,14 @@ struct ConcatInputStream(E, S1, S2) if (isInputStream!(S1, E) && isInputStream!(
     }
 }
 
+/**
+ * Function to obtain a concatenating input stream that reads from `stream1`,
+ * and then `stream2`.
+ * Params:
+ *   stream1 = The first stream to read from.
+ *   stream2 = The second stream to read from.
+ * Returns: The concatenating input stream.
+ */
 ConcatInputStream!(StreamType!S1, S1, S2) concatInputStreamFor(S1, S2)(ref S1 stream1, ref S2 stream2) {
     return ConcatInputStream!(StreamType!S1, S1, S2)(stream1, stream2);
 }
