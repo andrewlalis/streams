@@ -13,23 +13,29 @@ import streams.utils;
  * Params:
  *   input = The input stream to read from.
  *   output = The output stream to write to.
+ *   maxElements = The maximum number of elements to transfer. Defaults to an
+ *                 empty optional, meaning unlimited elements.
  * Returns: The result of the transfer operation.
  */
 StreamResult transferTo(I, O, E = StreamType!I, uint BufferSize = 4096)(
     ref I input,
-    ref O output
+    ref O output,
+    Optional!ulong maxElements = Optional!ulong.init
 ) if (isInputStream!(I, E) && isOutputStream!(O, E)) {
     E[BufferSize] buffer;
-    int totalItemsTransferred = 0;
-    while (true) {
-        StreamResult readResult = input.readFromStream(buffer);
+    uint totalItemsTransferred = 0;
+    while (maxElements.notPresent || totalItemsTransferred < maxElements.value) {
+        immutable uint elementsToRead = maxElements.present && (maxElements.value - totalItemsTransferred < BufferSize)
+            ? cast(uint) (maxElements.value - totalItemsTransferred)
+            : BufferSize;
+        StreamResult readResult = input.readFromStream(buffer[0 .. elementsToRead]);
         if (readResult.hasError) return readResult; // Quit if reading fails.
         if (readResult.count == 0) break; // No more elements to read.
 
         StreamResult writeResult = output.writeToStream(buffer[0 .. readResult.count]);
         if (writeResult.hasError) return writeResult;
         if (writeResult.count != readResult.count) {
-            return StreamResult(StreamError("Could not transfer all bytes.", writeResult.count));
+            return StreamResult(StreamError("Could not transfer all bytes to output stream.", writeResult.count));
         }
 
         totalItemsTransferred += writeResult.count;
@@ -57,6 +63,14 @@ unittest {
     sIn2.reset();
     auto sOut3 = NoOpOutputStream!ubyte();
     assert(transferTo(sIn2, sOut3).hasError);
+
+    // Check that if we set a maximum number of elements, that we only read that many.
+    int[10] buffer = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    auto sIn4 = arrayInputStreamFor(buffer);
+    auto sOut4 = arrayOutputStreamFor!int();
+    StreamResult result4 = transferTo(sIn4, sOut4, Optional!ulong(4));
+    assert(result4 == StreamResult(4));
+    assert(sOut4.toArrayRaw() == [1, 2, 3, 4]);
 }
 
 /** 
