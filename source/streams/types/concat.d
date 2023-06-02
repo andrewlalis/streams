@@ -11,9 +11,9 @@ import streams.primitives;
  * zero elements, then reads from the second stream.
  */
 struct ConcatInputStream(E, S1, S2) if (isInputStream!(S1, E) && isInputStream!(S2, E)) {
-    private S1* stream1;
+    private S1 stream1;
     private bool stream1Empty = false;
-    private S2* stream2;
+    private S2 stream2;
     private bool stream2Empty = false;
 
     /**
@@ -22,9 +22,9 @@ struct ConcatInputStream(E, S1, S2) if (isInputStream!(S1, E) && isInputStream!(
      *   stream1 = The first stream to read from.
      *   stream2 = The second stream to read from.
      */
-    this(ref S1 stream1, ref S2 stream2) {
-        this.stream1 = &stream1;
-        this.stream2 = &stream2;
+    this(S1 stream1, S2 stream2) {
+        this.stream1 = stream1;
+        this.stream2 = stream2;
     }
 
     /** 
@@ -66,7 +66,7 @@ struct ConcatInputStream(E, S1, S2) if (isInputStream!(S1, E) && isInputStream!(
  *   stream2 = The second stream to read from.
  * Returns: The concatenating input stream.
  */
-ConcatInputStream!(StreamType!S1, S1, S2) concatInputStreamFor(S1, S2)(ref S1 stream1, ref S2 stream2) {
+ConcatInputStream!(StreamType!S1, S1, S2) concatInputStreamFor(S1, S2)(S1 stream1, S2 stream2) {
     return ConcatInputStream!(StreamType!S1, S1, S2)(stream1, stream2);
 }
 
@@ -74,9 +74,10 @@ unittest {
     import streams.types.array;
     int[3] bufA = [1, 2, 3];
     int[3] bufB = [4, 5, 6];
-    auto sInA = arrayInputStreamFor(bufA);
-    auto sInB = arrayInputStreamFor(bufB);
-    auto concatAandB = concatInputStreamFor(sInA, sInB);
+    auto concatAandB = concatInputStreamFor(
+        arrayInputStreamFor(bufA),
+        arrayInputStreamFor(bufB)
+    );
     int[2] buf;
     
     auto result = concatAandB.readFromStream(buf);

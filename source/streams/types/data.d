@@ -58,8 +58,8 @@ private void ensureByteOrder(T)(
  * may be read from the stream as bytes.
  */
 struct DataInputStream(S) if (isByteInputStream!S) {
-    private S* stream;
-    private immutable Endianness endianness;
+    private S stream;
+    private immutable Endianness endianness = SYSTEM_ENDIANNESS;
 
     /** 
      * Constructs a data input stream that reads from a given underlying byte
@@ -69,8 +69,8 @@ struct DataInputStream(S) if (isByteInputStream!S) {
      *   endianness = The byte order of the resource that this stream is
      *                reading from. Defaults to the system byte order.
      */
-    this(ref S stream, Endianness endianness = SYSTEM_ENDIANNESS) {
-        this.stream = &stream;
+    this(S stream, Endianness endianness = SYSTEM_ENDIANNESS) {
+        this.stream = stream;
         this.endianness = endianness;
     }
 
@@ -158,7 +158,7 @@ struct DataInputStream(S) if (isByteInputStream!S) {
  * Returns: The data input stream.
  */
 DataInputStream!S dataInputStreamFor(S)(
-    ref S stream,
+    S stream,
     Endianness endianness = SYSTEM_ENDIANNESS
 ) if (isByteInputStream!S) {
     return DataInputStream!S(stream, endianness);
@@ -169,7 +169,7 @@ DataInputStream!S dataInputStreamFor(S)(
  * may be written to the stream as bytes.
  */
 struct DataOutputStream(S) if (isByteOutputStream!S) {
-    private S* stream;
+    private S stream;
     private immutable Endianness endianness;
 
     /** 
@@ -179,8 +179,8 @@ struct DataOutputStream(S) if (isByteOutputStream!S) {
      *   endianness = The byte order of the resource we're writing to. Defaults
      *                to the system byte order.
      */
-    this(ref S stream, Endianness endianness = SYSTEM_ENDIANNESS) {
-        this.stream = &stream;
+    this(S stream, Endianness endianness = SYSTEM_ENDIANNESS) {
+        this.stream = stream;
         this.endianness = endianness;
     }
 
@@ -255,7 +255,7 @@ struct DataOutputStream(S) if (isByteOutputStream!S) {
  * Returns: The data output stream.
  */
 DataOutputStream!S dataOutputStreamFor(S)(
-    ref S stream,
+    S stream,
     Endianness endianness = SYSTEM_ENDIANNESS
 ) if (isByteOutputStream!S) {
     return DataOutputStream!S(stream, endianness);
@@ -266,14 +266,14 @@ unittest {
     import streams.types.array : arrayOutputStreamFor, arrayInputStreamFor, byteArrayOutputStream;
 
     auto sOut = arrayOutputStreamFor!ubyte;
-    auto dataOut = dataOutputStreamFor(sOut);
+    auto dataOut = dataOutputStreamFor(&sOut);
     dataOut.writeToStream!int(42);
     dataOut.writeToStream(true);
     char[5] word = "Hello";
     dataOut.writeToStream(word);
     ubyte[] data = sOut.toArrayRaw();
     auto sIn = arrayInputStreamFor(data);
-    auto dataIn = dataInputStreamFor(sIn);
+    auto dataIn = dataInputStreamFor(&sIn);
     assert(dataIn.readFromStreamOrDefault!int() == 42);
     assert(dataIn.readFromStreamOrDefault!bool() == true);
     assert(dataIn.readFromStreamOrDefault!(char[5]) == word);
@@ -284,7 +284,7 @@ unittest {
     // Test that reading normally still works.
     ubyte[4] sIn1Data = [1, 2, 3, 4];
     auto sIn1 = arrayInputStreamFor!ubyte(sIn1Data);
-    auto dataIn1 = dataInputStreamFor(sIn1);
+    auto dataIn1 = dataInputStreamFor(&sIn1);
     ubyte[3] buffer1;
     assert(dataIn1.readFromStream(buffer1) == StreamResult(3));
     ubyte[3] buffer1Expected = [1, 2, 3];
@@ -292,7 +292,7 @@ unittest {
 
     // Test that writing normally still works.
     auto sOut1 = arrayOutputStreamFor!ubyte;
-    auto dataOut1 = dataOutputStreamFor(sOut1);
+    auto dataOut1 = dataOutputStreamFor(&sOut1);
     ubyte[3] buffer2 = [1, 2, 3];
     dataOut1.writeToStream(buffer2);
     assert(sOut1.toArrayRaw() == buffer2);
@@ -300,42 +300,42 @@ unittest {
     // Test that reading a static array with invalid data returns an error.
     ubyte[3] buffer3 = [1, 2, 3];
     auto sIn3 = arrayInputStreamFor!ubyte(buffer3);
-    auto dataIn3 = dataInputStreamFor(sIn3);
+    auto dataIn3 = dataInputStreamFor(&sIn3);
     DataReadResult!(ubyte[4]) result3 = dataIn3.readFromStream!(ubyte[4])();
     assert(result3.hasError);
     assert(result3.error.code == 0);
 
     // Test that writing a value to an output stream that doesn't write all bytes, causes an error.
     auto sOut3 = NoOpOutputStream!ubyte();
-    auto dataOut3 = dataOutputStreamFor(sOut3);
+    auto dataOut3 = dataOutputStreamFor(&sOut3);
     assert(dataOut3.writeToStream(42u).present);
 
     // Test that writing a value to an output stream that errors, also causes an error.
     auto sOut4 = ErrorOutputStream!ubyte();
-    auto dataOut4 = dataOutputStreamFor(sOut4);
+    auto dataOut4 = dataOutputStreamFor(&sOut4);
     OptionalStreamError error4 = dataOut4.writeToStream(1);
     assert(error4.present);
 
     // Test that writing a static array fails if writing one element fails.
     auto sOut5 = ErrorOutputStream!ubyte();
-    auto dataOut5 = dataOutputStreamFor(sOut5);
+    auto dataOut5 = dataOutputStreamFor(&sOut5);
     OptionalStreamError error5 = dataOut5.writeToStream!(int[3])([3, 2, 1]);
     assert(error5.present);
 
     // Test that writing to an array with opposite byte order works as expected.
     auto sOut6 = byteArrayOutputStream();
-    auto dataOut6 = dataOutputStreamFor(sOut6, Endianness.BigEndian);
+    auto dataOut6 = dataOutputStreamFor(&sOut6, Endianness.BigEndian);
     dataOut6.writeToStream!short(1);
     assert(sOut6.toArrayRaw() == [0, 1]);
     sOut6.reset();
-    auto dataOut7 = dataOutputStreamFor(sOut6, Endianness.LittleEndian);
+    auto dataOut7 = dataOutputStreamFor(&sOut6, Endianness.LittleEndian);
     dataOut7.writeToStream!short(1);
     assert(sOut6.toArrayRaw() == [1, 0]);
 
     // Test that readOrDefault works.
     ubyte[4] data7 = [1, 2, 3, 4];
     auto sIn7 = arrayInputStreamFor(data7);
-    auto dataIn7 = dataInputStreamFor(sIn7);
+    auto dataIn7 = dataInputStreamFor(&sIn7);
     for (uint i = 0; i < 4; i++) {
         assert(dataIn7.readFromStreamOrDefault!ubyte() == data7[i]);
     }

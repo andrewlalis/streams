@@ -16,6 +16,8 @@ Features:
 - Simple, extensible interface
 - Seamless conversion between streams and ranges
 - Fully documented API
+- Flexible ownership: pass a stream directly to transfer ownership, or pass a
+pointer to a stream to temporarily give something access to your stream.
 - Many basic stream types are included:
     - Array input streams for reading from arrays, and array output streams to
     write to an in-memory array buffer.
@@ -59,6 +61,37 @@ things that behave as both an input and output range.
 - To convert a stream to a range: `auto range = asRange(stream);` You can also
 use `asInputRange` and `asOutputRange` to be more explicit when dealing with
 streams that implement both input and output functions.
+
+## Ownership
+
+Since most streams (think sockets, files, memory buffers) have some internal
+state, we want to keep that state even if we hand off our stream to some other
+function or wrapper stream. For example:
+
+```d
+auto buf = byteArrayOutputStream();
+auto dataOut = dataOutputStreamFor(&buf);
+// dataOut is borrowing buf from us.
+dataOut.writeToStream!uint(42);
+assert(buf.toArrayRaw().length == 4);
+// uint == 4 bytes.
+```
+
+Sometimes though, we just want to pass a stream to a wrapper and give it
+complete ownership, because we won't need it anymore. In that case, just pass
+it directly; no reference or pointers.
+
+```d
+auto sIn = SocketInputStream(mySocket);
+auto bufIn = bufferedInputStreamFor(sIn);
+// We should no longer read directly from sIn.
+// Its state is controlled by bufIn, and sIn's no longer updates.
+
+// Here's another common use case: wrapping an array stream:
+ubyte[] myRawData = [1, 2, 3, 4, 5, 6, 7, 8];
+auto dataIn = dataInputStreamFor(arrayInputStreamFor(myRawData));
+ulong value = dataIn.readFromStreamOrDefault!ulong();
+```
 
 ## Development
 

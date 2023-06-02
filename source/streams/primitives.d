@@ -87,6 +87,11 @@ unittest {
         StreamResult readFromStream(ubyte[] buffer) { return StreamResult(0); } // cov-ignore
     }
     assert(isSomeInputStream!S1);
+    // Check that pointers to streams are also considered as streams.
+    assert(isSomeInputStream!(S1*));
+    // But double or triple pointers (or anything else) are not!
+    assert(!isSomeInputStream!(S1**));
+    assert(!isSomeInputStream!(S1***));
     struct S2 {
         StreamResult readFromStream(bool[] buffer) { return StreamResult(42); } // cov-ignore
     }
@@ -139,6 +144,10 @@ unittest {
         StreamResult writeToStream(ubyte[] buffer) { return StreamResult(0); } // cov-ignore
     }
     assert(isSomeOutputStream!S1);
+    // Check that pointers to output streams are also considered streams (but not double and so on).
+    assert(isSomeOutputStream!(S1*));
+    assert(!isSomeOutputStream!(S1**));
+    assert(!isSomeOutputStream!(S1***));
     struct S2 {
         StreamResult writeToStream(bool[] buffer) { return StreamResult(42); } // cov-ignore
     }
@@ -179,6 +188,7 @@ unittest {
         }
     }
     assert(is(StreamType!S1 == bool));
+    assert(is(StreamType!(S1*) == bool));
 }
 
 /** 
@@ -302,7 +312,7 @@ unittest {
  * given data type.
  */
 bool isSomeStream(StreamType, DataType)() {
-    return isInputStream!(StreamType, DataType) || isOutputStream(StreamType, DataType);
+    return isInputStream!(StreamType, DataType) || isOutputStream!(StreamType, DataType);
 }
 
 /** 
@@ -353,6 +363,7 @@ unittest {
         }
     }
     assert(isClosableStream!S1);
+    assert(isClosableStream!(S1*));
     struct S2 {
         StreamResult readFromStream(ubyte[] buffer) {
             return StreamResult(0); // cov-ignore
@@ -395,6 +406,7 @@ unittest {
         }
     }
     assert(isFlushableStream!S1);
+    assert(isFlushableStream!(S1*));
     struct S2 {
         StreamResult writeToStream(ubyte[] buffer) {
             return StreamResult(0); // cov-ignore
@@ -427,6 +439,55 @@ bool isSeekableStream(S)() {
     } else {
         return false;
     }
+}
+
+/**
+ * Determines if the given template argument is a pointer to a stream.
+ * Returns: `true` if the given argument is a pointer to a stream.
+ */
+bool isPointerToStream(S)() {
+    return is(S == B*, B) && isSomeStream!S;
+}
+
+unittest {
+    struct S1 {
+        StreamResult readFromStream(ubyte[] buf) {
+            return StreamResult(0); // cov-ignore
+        }
+    }
+    struct S2 {
+        void doStuff() {} // cov-ignore
+    }
+    assert(isPointerToStream!(S1*));
+    assert(!isPointerToStream!S1);
+    assert(!isPointerToStream!(S1**));
+    assert(!isPointerToStream!(S2*));
+}
+
+/** 
+ * Determines if the given template argument is a direct stream type, and that
+ * it is not a pointer. If true, then this implies that the caller "owns" the
+ * stream, and the stream should not be used outside of owner's scope.
+ * Returns: `true` if the given argument is a stream, and not a pointer to one.
+ */
+bool isNonPointerStream(S)() {
+    return !is(S == B*, B) && isSomeStream!S;
+}
+
+unittest {
+    struct S1 {
+        StreamResult readFromStream(ubyte[] buf) {
+            return StreamResult(0); // cov-ignore
+        }
+    }
+    struct S2 {
+        void doStuff() {} // cov-ignore
+    }
+    assert(isNonPointerStream!(S1));
+    assert(!isNonPointerStream!(S1*));
+    assert(!isNonPointerStream!(S1**));
+    assert(!isNonPointerStream!(S2*));
+    assert(!isNonPointerStream!S2);
 }
 
 /** 
