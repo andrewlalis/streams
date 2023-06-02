@@ -82,6 +82,12 @@ struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
 
         return StreamResult(bytesRead);
     }
+
+    static if (isClosableStream!S) {
+        OptionalStreamError closeStream() {
+            return this.stream.closeStream();
+        }
+    }
 }
 
 unittest {
@@ -94,6 +100,10 @@ unittest {
     StreamResult result1 = cIn1.readFromStream(buffer1);
     assert(result1.hasCount && result1.count > 0);
     assert(buffer1[0 .. result1.count] == "Wikipedia in \r\nchunks.");
+}
+
+ChunkedEncodingInputStream!S chunkedEncodingInputStreamFor(S)(S stream) if (isByteInputStream!S) {
+    return ChunkedEncodingInputStream!(S)(stream);
 }
 
 /** 
