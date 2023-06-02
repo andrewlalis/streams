@@ -17,7 +17,9 @@ const uint DEFAULT_BUFFER_SIZE = 4096;
  * been read into an internal buffer, so that calls to `readToStream` don't all
  * necessitate reading from the underlying resource.
  */
-struct BufferedInputStream(S, E = StreamType!S, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isInputStream!(S, E)) {
+struct BufferedInputStream(S, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isSomeInputStream!S) {
+    private alias E = StreamType!S;
+
     private S stream;
     private E[BufferSize] internalBuffer;
     private uint nextIndex = BufferSize;
@@ -91,6 +93,12 @@ struct BufferedInputStream(S, E = StreamType!S, uint BufferSize = DEFAULT_BUFFER
         this.elementsInBuffer = result.count;
         return result;
     }
+
+    static if (isClosableStream!S) {
+        OptionalStreamError closeStream() {
+            return this.stream.closeStream();
+        }
+    }
 }
 
 /** 
@@ -100,10 +108,10 @@ struct BufferedInputStream(S, E = StreamType!S, uint BufferSize = DEFAULT_BUFFER
  *   stream = The stream to wrap in a buffered input stream.
  * Returns: The buffered input stream.
  */
-BufferedInputStream!S bufferedInputStreamFor(S, uint BufferSize = DEFAULT_BUFFER_SIZE)(
+BufferedInputStream!(S, BufferSize) bufferedInputStreamFor(uint BufferSize = DEFAULT_BUFFER_SIZE, S)(
     S stream
 ) if (isSomeInputStream!S) {
-    return BufferedInputStream!(S, StreamType!S, BufferSize)(stream);
+    return BufferedInputStream!(S, BufferSize)(stream);
 }
 
 unittest {
@@ -124,7 +132,7 @@ unittest {
     // Check that a read error propagates.
     import streams.primitives : ErrorInputStream;
     auto sIn3 = ErrorInputStream!int();
-    auto bufIn3 = BufferedInputStream!(typeof(sIn3), int)(sIn3);
+    auto bufIn3 = BufferedInputStream!(typeof(sIn3))(sIn3);
     int[64] buf3;
     assert(bufIn3.readFromStream(buf3).hasError);
 
@@ -140,7 +148,9 @@ unittest {
  * A buffered wrapper around another output stream, that buffers writes up to
  * `BufferSize` elements before flushing the buffer to the underlying stream.
  */
-struct BufferedOutputStream(S, E = StreamType!E, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isOutputStream!(S, E)) {
+struct BufferedOutputStream(S, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isSomeOutputStream!S) {
+    private alias E = StreamType!S;
+
     private S stream;
     private E[BufferSize] internalBuffer;
     private uint nextIndex = 0;
@@ -201,6 +211,22 @@ struct BufferedOutputStream(S, E = StreamType!E, uint BufferSize = DEFAULT_BUFFE
     OptionalStreamError flushStream() {
         return this.internalFlush();
     }
+
+    static if (isClosableStream!S) {
+        OptionalStreamError closeStream() {
+            OptionalStreamError flushError = this.flushStream();
+            OptionalStreamError closeError = this.stream.closeStream();
+            if (closeError.present) return closeError;
+            if (flushError.present) return flushError;
+            return OptionalStreamError.init;
+        }
+    }
+}
+
+BufferedOutputStream!(S, BufferSize) bufferedOutputStreamFor(uint BufferSize = DEFAULT_BUFFER_SIZE, S)(
+    S stream
+) if (isSomeOutputStream!S) {
+    return BufferedOutputStream!(S, BufferSize)(stream);
 }
 
 unittest {
@@ -208,7 +234,7 @@ unittest {
     import streams.types.array : byteArrayOutputStream;
 
     auto sOut1 = byteArrayOutputStream();
-    auto bufOut1 = BufferedOutputStream!(typeof(&sOut1), ubyte, 4)(&sOut1);
+    auto bufOut1 = bufferedOutputStreamFor!(4)(&sOut1);
 
     assert(isOutputStream!(typeof(bufOut1), ubyte));
     assert(isFlushableStream!(typeof(bufOut1)));
