@@ -223,6 +223,13 @@ struct BufferedOutputStream(S, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isSome
     }
 }
 
+/**
+ * Creates and returns a buffered output stream that's wrapped around the given
+ * output stream.
+ * Params:
+ *   stream = The stream to wrap in a buffered output stream.
+ * Returns: The buffered output stream.
+ */
 BufferedOutputStream!(S, BufferSize) bufferedOutputStreamFor(uint BufferSize = DEFAULT_BUFFER_SIZE, S)(
     S stream
 ) if (isSomeOutputStream!S) {
