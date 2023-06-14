@@ -62,17 +62,16 @@ interface FlushableStream {
 /** 
  * Input stream implementation that wraps around a primitive input stream.
  */
-class InputStreamWrapper(S, E = StreamType!S) : InputStream!E if (isInputStream!(S, E)) {
-    private S* stream;
+class InputStreamObject(S, E = StreamType!S) : InputStream!E if (isInputStream!(S, E)) {
+    private S stream;
 
     /**
-     * Constructs the input stream wrapper with a reference to a primitive
-     * input stream.
+     * Constructs the input stream wrapper with the given base stream.
      * Params:
      *   stream = The stream to wrap in an object-oriented stream.
      */
-    this(ref S stream) {
-        this.stream = &stream;
+    this(S stream) {
+        this.stream = stream;
     }
 
     /** 
@@ -94,15 +93,15 @@ class InputStreamWrapper(S, E = StreamType!S) : InputStream!E if (isInputStream!
  *   stream = The stream to wrap.
  * Returns: An input stream wrapper object.
  */
-InputStreamWrapper!(S, E) inputStreamWrapperFor(S, E = StreamType!S)(ref S stream) if (isInputStream!(S, E)) {
-    return new InputStreamWrapper!(S, E)(stream);
+InputStreamObject!(S, E) inputStreamObjectFor(S, E = StreamType!S)(S stream) if (isInputStream!(S, E)) {
+    return new InputStreamObject!(S, E)(stream);
 }
 
 /** 
  * Output stream implementation that wraps around a primitive output stream.
  */
-class OutputStreamWrapper(S, E = StreamType!S) : OutputStream!E if (isOutputStream!(S, E)) {
-    private S* stream;
+class OutputStreamObject(S, E = StreamType!S) : OutputStream!E if (isOutputStream!(S, E)) {
+    private S stream;
 
     /**
      * Constructs the output stream wrapper with a reference to a primitive
@@ -110,8 +109,8 @@ class OutputStreamWrapper(S, E = StreamType!S) : OutputStream!E if (isOutputStre
      * Params:
      *   stream = The stream to wrap in an object-oriented stream.
      */
-    this(ref S stream) {
-        this.stream = &stream;
+    this(S stream) {
+        this.stream = stream;
     }
 
     /**
@@ -132,30 +131,30 @@ class OutputStreamWrapper(S, E = StreamType!S) : OutputStream!E if (isOutputStre
  *   stream = The stream to wrap.
  * Returns: An output stream wrapper object.
  */
-OutputStreamWrapper!(S, E) outputStreamWrapperFor(S, E = StreamType!S)(ref S stream) if (isOutputStream!(S, E)) {
-    return new OutputStreamWrapper!(S, E)(stream);
+OutputStreamObject!(S, E) outputStreamObjectFor(S, E = StreamType!S)(S stream) if (isOutputStream!(S, E)) {
+    return new OutputStreamObject!(S, E)(stream);
 }
 
 unittest {
     import streams;
     // Test input stream wrapper.
     auto sIn1 = arrayInputStreamFor!ubyte([1, 2, 3, 4]);
-    auto wrapIn1 = new InputStreamWrapper!(typeof(sIn1))(sIn1);
+    auto wrapIn1 = new InputStreamObject!(typeof(&sIn1))(&sIn1);
     ubyte[] buffer1 = new ubyte[4];
     assert(wrapIn1.readFromStream(buffer1) == StreamResult(4));
     assert(buffer1 == [1, 2, 3, 4]);
     // Test using the function to make it easier.
     sIn1.reset();
-    wrapIn1 = inputStreamWrapperFor(sIn1);
+    wrapIn1 = inputStreamObjectFor(&sIn1);
     assert(wrapIn1.readFromStream(buffer1[0 .. 2]) == StreamResult(2));
     assert(buffer1[0 .. 2] == [1, 2]);
 
     // Test output stream wrapper.
     auto sOut1 = byteArrayOutputStream();
-    auto wrapOut1 = new OutputStreamWrapper!(typeof(sOut1))(sOut1);
+    auto wrapOut1 = new OutputStreamObject!(typeof(&sOut1))(&sOut1);
     assert(wrapOut1.writeToStream([1]) == StreamResult(1));
     assert(sOut1.toArrayRaw() == [1]);
-    wrapOut1 = outputStreamWrapperFor(sOut1);
+    wrapOut1 = outputStreamObjectFor(&sOut1);
     assert(wrapOut1.writeToStream([2, 3, 4]) == StreamResult(3));
     assert(sOut1.toArrayRaw() == [1, 2, 3, 4]);
 }

@@ -4,8 +4,8 @@
  */
 module streams.range;
 
-import streams.primitives : StreamResult, StreamType, isInputStream, isSomeInputStream, isOutputStream, isSomeStream;
-import streams.utils : Optional;
+import streams.primitives;
+import streams.utils;
 import std.range : isInputRange, isOutputRange, ElementType, empty, front, popFront, put;
 
 /** 
@@ -13,7 +13,7 @@ import std.range : isInputRange, isOutputRange, ElementType, empty, front, popFr
  * input range for elements of the same type.
  */
 struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
-    private S* stream;
+    private S stream;
     private Optional!E lastElement;
     private StreamResult lastRead;
 
@@ -22,8 +22,8 @@ struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
      * Params:
      *   stream = The input stream to read from.
      */
-    this(ref S stream) {
-        this.stream = &stream;
+    this(S stream) {
+        this.stream = stream;
         // Initialize the range with one element.
         this.popFront();
     }
@@ -62,23 +62,19 @@ struct InputStreamRange(S, E = StreamType!S) if (isInputStream!(S, E)) {
 
 /** 
  * Wraps an existing input stream as a Phobos-style input range, to make any
- * input stream compatible with functions that take input ranges. The given
- * stream is stored as a pointer in the underlying range implementation, so you
- * should still manage ownership of the original stream.
- *
+ * input stream compatible with functions that take input ranges.
  * Params:
  *   stream = The stream to wrap.
  * Returns: The input range.
  */
-auto asInputRange(S, E = StreamType!S)(ref S stream) if (isInputStream!(S, E)) {
+auto asInputRange(S, E = StreamType!S)(S stream) if (isInputStream!(S, E)) {
     return InputStreamRange!(S, E)(stream);
 }
 
 unittest {
     import streams : arrayInputStreamFor;
     ubyte[3] buf = [1, 2, 3];
-    auto s = arrayInputStreamFor(buf);
-    auto r = asInputRange(s);
+    auto r = asInputRange(arrayInputStreamFor(buf));
     assert(isInputRange!(typeof(r)));
     assert(!r.empty());
     assert(r.front() == 1);
@@ -144,7 +140,7 @@ unittest {
  * style output range for elements of the same type.
  */
 struct OutputStreamRange(S, E = StreamType!S) if (isOutputStream!(S, E)) {
-    private S* stream;
+    private S stream;
     
     /**
      * Writes all elements in `buffer` to the underlying stream.
@@ -159,22 +155,19 @@ struct OutputStreamRange(S, E = StreamType!S) if (isOutputStream!(S, E)) {
 /**
  * Wraps an existing output stream as a Phobos-style output range with a
  * `put` method, to make any output stream compatible with functions that take
- * output ranges. The given stream is stored as a pointer in the underlying
- * range implementation, so you should still manage ownership of the original
- * stream.
- *
+ * output ranges.
  * Params:
  *   stream = The stream to wrap.
  * Returns: The output range.
  */
-auto asOutputRange(S, E = StreamType!S)(ref S stream) if (isOutputStream!(S, E)) {
-    return OutputStreamRange!(S, E)(&stream);
+auto asOutputRange(S, E = StreamType!S)(S stream) if (isOutputStream!(S, E)) {
+    return OutputStreamRange!(S, E)(stream);
 }
 
 unittest {
     import streams : arrayOutputStreamFor;
     auto s = arrayOutputStreamFor!ubyte;
-    auto o = asOutputRange(s);
+    auto o = asOutputRange(&s);
     assert(isOutputRange!(typeof(o), ubyte));
     assert(s.toArrayRaw() == []);
     ubyte[3] buf = [1, 2, 3];

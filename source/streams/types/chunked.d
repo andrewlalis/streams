@@ -6,13 +6,13 @@ import streams.primitives;
  * An input stream for reading from a chunked-encoded stream of bytes.
  */
 struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
-    private S* stream;
+    private S stream;
     private uint currentChunkSize = 0;
     private uint currentChunkIndex = 0;
     private bool endOfStream = false;
 
-    this(ref S stream) {
-        this.stream = &stream;
+    this(S stream) {
+        this.stream = stream;
     }
 
     /** 
@@ -33,7 +33,12 @@ struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
                 import streams.types.data : DataInputStream, dataInputStreamFor, DataReadResult;
                 import streams.utils : Optional, readHexString;
                 // Try to read the next chunk header.
-                DataInputStream!S dIn = dataInputStreamFor(*this.stream);
+                // If we are using a pointer to a stream, we can just pass that to the data stream.
+                static if (isPointerToStream!S) {
+                    DataInputStream!S dIn = dataInputStreamFor(this.stream);
+                } else { // Otherwise, we need to pass a reference to our stream to the data stream.
+                    DataInputStream!(S*) dIn = dataInputStreamFor(&this.stream);
+                }
                 char[32] hexChars;
                 uint charIdx = 0;
                 // Keep reading until we reach the first \r\n.
@@ -77,6 +82,12 @@ struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
 
         return StreamResult(bytesRead);
     }
+
+    static if (isClosableStream!S) {
+        OptionalStreamError closeStream() {
+            return this.stream.closeStream();
+        }
+    }
 }
 
 unittest {
@@ -91,14 +102,18 @@ unittest {
     assert(buffer1[0 .. result1.count] == "Wikipedia in \r\nchunks.");
 }
 
+ChunkedEncodingInputStream!S chunkedEncodingInputStreamFor(S)(S stream) if (isByteInputStream!S) {
+    return ChunkedEncodingInputStream!(S)(stream);
+}
+
 /** 
  * An output stream for writing to a chunked-encoded stream of bytes.
  */
 struct ChunkedEncodingOutputStream(S) if (isByteOutputStream!S) {
-    private S* stream;
+    private S stream;
 
-    this(ref S stream) {
-        this.stream = &stream;
+    this(S stream) {
+        this.stream = stream;
     }
 
     /** 
