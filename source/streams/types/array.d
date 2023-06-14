@@ -23,9 +23,10 @@ struct ArrayInputStream(E) {
      */
     StreamResult readFromStream(E[] buffer) {
         if (this.currentIndex >= this.array.length) return StreamResult(0);
-        uint bufferLength = cast(uint) buffer.length;
-        uint lengthRemaining = cast(uint) this.array.length - this.currentIndex;
-        uint lengthToRead = lengthRemaining < bufferLength ? lengthRemaining : bufferLength;
+        uint lengthToRead = cast(uint) this.array.length - this.currentIndex;
+        if (lengthToRead > buffer.length) {
+            lengthToRead = cast(uint) buffer.length;
+        }
         buffer[0 .. lengthToRead] = this.array[this.currentIndex .. this.currentIndex + lengthToRead];
         this.currentIndex += lengthToRead;
         return StreamResult(lengthToRead);
@@ -56,6 +57,7 @@ unittest {
     assert(buffer == [3, 4]);
     assert(s1.readFromStream(buffer) == StreamResult(1));
     assert(buffer == [5, 4]);
+    assert(s1.readFromStream(buffer) == StreamResult(0));
 
     s1.reset();
     assert(s1.readFromStream(buffer) == StreamResult(2));
@@ -66,6 +68,17 @@ unittest {
     assert(singleBuffer[0] == 3);
     assert(s1.readFromStream(singleBuffer) == StreamResult(1));
     assert(singleBuffer[0] == 4);
+    s1.readFromStream(singleBuffer); // Skip the last element.
+    assert(s1.readFromStream(singleBuffer) == StreamResult(0));
+
+    // Test reading to a buffer that's larger than the stream's internal buffer.
+    ubyte[4] data3 = [5, 4, 3, 2];
+    ubyte[10] buffer3;
+    auto s3 = ArrayInputStream!ubyte(data3);
+    assert(s3.readFromStream(buffer3) == StreamResult(4));
+    assert(buffer3[0 .. 4] == data3);
+    assert(s3.readFromStream(buffer3) == StreamResult(0));
+
 }
 
 /** 
