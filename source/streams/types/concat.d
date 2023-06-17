@@ -6,6 +6,8 @@ module streams.types.concat;
 
 import streams.primitives;
 
+version (Have_slf4d) {import slf4d;}
+
 /**
  * A concatenating input stream that reads from one stream until it returns
  * zero elements, then reads from the second stream.
@@ -37,15 +39,24 @@ struct ConcatInputStream(E, S1, S2) if (isInputStream!(S1, E) && isInputStream!(
     StreamResult readFromStream(E[] buffer) {
         uint bufferIndex = 0;
         if (!this.stream1Empty) {
+            version (Have_slf4d) {
+                traceF!"Reading up to %d elements from the first stream: %s"(buffer.length, typeof(stream1).stringof);
+            }
             StreamResult result1 = this.stream1.readFromStream(buffer);
             if (result1.hasError) return result1;
             if (result1.count == buffer.length) return result1;
             // Less than buffer.length elements were read.
             this.stream1Empty = true;
             bufferIndex = result1.count;
+            version (Have_slf4d) {
+                traceF!"Finished reading from the first stream after %d elements."(bufferIndex);
+            }
         }
         if (!this.stream2Empty) {
             const uint elementsToRead = cast(uint) buffer.length - bufferIndex;
+            version (Have_slf4d) {
+                traceF!"Reading up to %d elements from the second stream: %s"(elementsToRead, typeof(stream2).stringof);
+            }
             StreamResult result2 = this.stream2.readFromStream(buffer[bufferIndex .. $]);
             if (result2.hasError) return result2;
             if (result2.count == elementsToRead) return StreamResult(bufferIndex + result2.count);
@@ -98,4 +109,10 @@ unittest {
     result = concatAandB.readFromStream(buf);
     assert(!result.hasError);
     assert(result.count == 0);
+
+    // Try reading from two empty streams.
+    auto emptyConcat = concatInputStreamFor(NoOpInputStream!int(), NoOpInputStream!int());
+    int[10] buf2;
+    assert(emptyConcat.readFromStream(buf2) == StreamResult(0));
+    assert(emptyConcat.readFromStream(buf2) == StreamResult(0)); // Test again just to cover the last case.
 }
