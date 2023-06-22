@@ -84,6 +84,12 @@ class InputStreamObject(S, E = StreamType!S) : InputStream!E if (isInputStream!(
     StreamResult readFromStream(E[] buffer) {
         return this.stream.readFromStream(buffer);
     }
+
+    static if (isClosableStream!S) {
+        OptionalStreamError closeStream() {
+            return this.stream.closeStream();
+        }
+    }
 }
 
 /** 
@@ -122,6 +128,18 @@ class OutputStreamObject(S, E = StreamType!S) : OutputStream!E if (isOutputStrea
     StreamResult writeToStream(E[] buffer) {
         return this.stream.writeToStream(buffer);
     }
+
+    static if (isClosableStream!S) {
+        OptionalStreamError closeStream() {
+            return this.stream.closeStream();
+        }
+    }
+
+    static if (isFlushableStream!S) {
+        OptionalStreamError flushStream() {
+            return this.stream.flushStream();
+        }
+    }
 }
 
 /** 
@@ -148,6 +166,10 @@ unittest {
     wrapIn1 = inputStreamObjectFor(&sIn1);
     assert(wrapIn1.readFromStream(buffer1[0 .. 2]) == StreamResult(2));
     assert(buffer1[0 .. 2] == [1, 2]);
+    // Test that if the wrapped input stream is closable, then so is the object.
+    InputStream!ubyte sIn2 = inputStreamObjectFor(FileInputStream("LICENSE"));
+    assert(isClosableStream!(typeof(sIn2)));
+    assert(!sIn2.closeStream().hasError);
 
     // Test output stream wrapper.
     auto sOut1 = byteArrayOutputStream();
