@@ -25,7 +25,9 @@ struct SocketInputStream {
      */
     StreamResult readFromStream(ubyte[] buffer) {
         ptrdiff_t receiveCount = this.socket.receive(buffer);
-        if (receiveCount == Socket.ERROR) return StreamResult(StreamError("Socket error.", cast(int) receiveCount));
+        if (receiveCount == Socket.ERROR) {
+            return StreamResult(StreamError("Socket error: " ~ lastSocketError(), cast(int) receiveCount));
+        }
         return StreamResult(cast(uint) receiveCount);
     }
 
@@ -53,7 +55,9 @@ struct SocketOutputStream {
      */
     StreamResult writeToStream(ubyte[] buffer) {
         ptrdiff_t sendCount = this.socket.send(buffer);
-        if (sendCount == Socket.ERROR) return StreamResult(StreamError("Socket error.", cast(int) sendCount));
+        if (sendCount == Socket.ERROR) {
+            return StreamResult(StreamError("Socket error: " ~ lastSocketError(), cast(int) sendCount));
+        }
         return StreamResult(cast(uint) sendCount);
     }
 

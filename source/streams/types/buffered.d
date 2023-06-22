@@ -7,6 +7,8 @@ module streams.types.buffered;
 
 import streams.primitives;
 
+version (Have_slf4d) {import slf4d;}
+
 /** 
  * The default size for buffered input and output streams.
  */
@@ -49,9 +51,15 @@ struct BufferedInputStream(S, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isSomeI
             E[] writableSlice = buffer[elementsRead .. $];
             uint elementsFromInternal = this.readFromInternalBuffer(writableSlice);
             elementsRead += elementsFromInternal;
+            version (Have_slf4d) {
+                traceF!"Read %d elements from internal buffer."(elementsFromInternal);
+            }
 
             // Then, if necessary, refresh the internal buffer.
             if (elementsRead < buffer.length && !this.streamEnded) {
+                version (Have_slf4d) {
+                    traceF!"Refreshing internal buffer to read at most %d more elements."(buffer.length - elementsRead);
+                }
                 StreamResult readResult = this.refreshInternalBuffer();
                 if (readResult.hasError) return readResult;
             } else if (this.streamEnded) {
@@ -86,9 +94,15 @@ struct BufferedInputStream(S, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isSomeI
         if (this.streamEnded) return StreamResult(0);
         StreamResult result = this.stream.readFromStream(this.internalBuffer);
         if (result.hasError) return result; // Exit right away in case of error.
+        version (Have_slf4d) {
+            traceF!"Refreshed internal buffer with %d more elements."(result.count);
+        }
         this.nextIndex = 0;
         if (result.count < BufferSize) {
             this.streamEnded = true;
+            version (Have_slf4d) {
+                trace("Internal stream has ended.");
+            }
         }
         this.elementsInBuffer = result.count;
         return result;
@@ -179,6 +193,9 @@ struct BufferedOutputStream(S, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isSome
             const uint remainingElements = cast(uint) buffer.length - bufferIndex;
             const uint remainingCapacity = BufferSize - nextIndex;
             const uint elementsToWrite = remainingElements > remainingCapacity ? remainingCapacity : remainingElements;
+            version (Have_slf4d) {
+                traceF!"Writing %d elements to the internal buffer."(elementsToWrite);
+            }
 
             // Do the copy operation.
             const newInternalBufferIndex = this.nextIndex + elementsToWrite;
@@ -201,6 +218,9 @@ struct BufferedOutputStream(S, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isSome
     private OptionalStreamError internalFlush() {
         StreamResult result = this.stream.writeToStream(this.internalBuffer[0 .. this.nextIndex]);
         if (result.hasError) return OptionalStreamError(result.error);
+        version (Have_slf4d) {
+            traceF!"Flushed %d elements from the internal buffer to the stream."(result.count);
+        }
         this.nextIndex = 0;
         return OptionalStreamError.init;
     }
