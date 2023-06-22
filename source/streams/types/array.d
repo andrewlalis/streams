@@ -27,7 +27,14 @@ struct ArrayInputStream(E) {
         if (lengthToRead > buffer.length) {
             lengthToRead = cast(uint) buffer.length;
         }
-        buffer[0 .. lengthToRead] = this.array[this.currentIndex .. this.currentIndex + lengthToRead];
+        version (D_BetterC) {
+            foreach (uint idx; 0 .. lengthToRead) {
+                buffer[idx] = this.array[this.currentIndex + idx];
+            }
+        } else {
+            import std.algorithm.mutation : copy;
+            copy(this.array[this.currentIndex .. this.currentIndex + lengthToRead], buffer[0 .. lengthToRead]);
+        }
         this.currentIndex += lengthToRead;
         return StreamResult(lengthToRead);
     }
