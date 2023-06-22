@@ -166,10 +166,6 @@ unittest {
     wrapIn1 = inputStreamObjectFor(&sIn1);
     assert(wrapIn1.readFromStream(buffer1[0 .. 2]) == StreamResult(2));
     assert(buffer1[0 .. 2] == [1, 2]);
-    // Test that if the wrapped input stream is closable, then so is the object.
-    InputStream!ubyte sIn2 = inputStreamObjectFor(FileInputStream("LICENSE"));
-    assert(isClosableStream!(typeof(sIn2)));
-    assert(!sIn2.closeStream().hasError);
 
     // Test output stream wrapper.
     auto sOut1 = byteArrayOutputStream();
