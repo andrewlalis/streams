@@ -98,7 +98,7 @@ struct BufferedInputStream(S, uint BufferSize = DEFAULT_BUFFER_SIZE) if (isSomeI
             traceF!"Refreshed internal buffer with %d more elements."(result.count);
         }
         this.nextIndex = 0;
-        if (result.count < BufferSize) {
+        if (result.count == 0) {
             this.streamEnded = true;
             version (Have_slf4d) {
                 trace("Internal stream has ended.");
