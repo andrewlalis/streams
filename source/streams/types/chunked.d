@@ -30,22 +30,16 @@ struct ChunkedEncodingInputStream(S) if (isByteInputStream!S) {
 
         while (bytesRead < buffer.length) {
             if (this.currentChunkSize == 0 || this.currentChunkIndex == this.currentChunkSize) {
-                import streams.types.data : DataInputStream, dataInputStreamFor, DataReadResult;
                 import streams.utils : Optional, readHexString;
                 // Try to read the next chunk header.
-                // If we are using a pointer to a stream, we can just pass that to the data stream.
-                static if (isPointerToStream!S) {
-                    DataInputStream!S dIn = dataInputStreamFor(this.stream);
-                } else { // Otherwise, we need to pass a reference to our stream to the data stream.
-                    DataInputStream!(S*) dIn = dataInputStreamFor(&this.stream);
-                }
                 char[32] hexChars;
                 uint charIdx = 0;
                 // Keep reading until we reach the first \r\n.
                 while (!(charIdx >= 2 && hexChars[charIdx - 2] == '\r' && hexChars[charIdx - 1] == '\n')) {
-                    DataReadResult!char result = dIn.readFromStream!char();
-                    if (result.hasError) return StreamResult(result.error);
-                    hexChars[charIdx++] = result.value;
+                    ubyte[1] charBuffer;
+                    StreamResult result = this.stream.readFromStream(charBuffer);
+                    if (result.hasError) return result;
+                    hexChars[charIdx++] = cast(char) charBuffer[0];
                 }
                 Optional!uint chunkSize = readHexString(hexChars[0 .. charIdx - 2]);
                 if (!chunkSize.present) return StreamResult(StreamError("Invalid or missing chunk header size.", -1));
