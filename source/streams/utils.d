@@ -56,6 +56,9 @@ unittest {
  * will allow you to call `s.first`, `s.second`, `s.hasFirst`, and `s.hasSecond`.
  */
 struct Either(A, string NameA, B, string NameB) if (!is(A == B)) {
+    alias firstType = A;
+    alias secondType = B;
+
     private enum checkA = "has" ~ (NameA[0] - ('a' - 'A')) ~ NameA[1 .. $];
     private enum checkB = "has" ~ (NameB[0] - ('a' - 'A')) ~ NameB[1 .. $];
 

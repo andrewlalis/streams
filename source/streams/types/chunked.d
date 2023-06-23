@@ -110,6 +110,11 @@ unittest {
     StreamResult result1 = cIn1.readFromStream(buffer1);
     assert(result1.hasCount && result1.count > 0);
     assert(buffer1[0 .. result1.count] == "Wikipedia in \r\nchunks.");
+
+    ubyte[] sample2 = cast(ubyte[]) "3\r\nabc"; // Invalid: missing trailing \r\n
+    auto cIn2 = chunkedEncodingInputStreamFor(arrayInputStreamFor(sample2));
+    ubyte[1024] buffer2;
+    assert(cIn2.readFromStream(buffer2).hasError);
 }
 
 ChunkedEncodingInputStream!S chunkedEncodingInputStreamFor(S)(S stream) if (isByteInputStream!S) {
