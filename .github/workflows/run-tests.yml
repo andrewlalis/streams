@@ -17,6 +17,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         compiler: [dmd-latest, ldc-latest]
+        # DMD is not supported on macOS, so we exclude it below.
+        exclude:
+          - os: macOS-latest
+            compiler: dmd-latest
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
