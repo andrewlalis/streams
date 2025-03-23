@@ -191,6 +191,40 @@ unittest {
     assert(is(StreamType!(S1*) == bool));
 }
 
+/**
+ * A template that evaluates to the base, or lowest level of a given input or
+ * output stream, which may be useful when a stream is wrapped by many
+ * decorator stream types.
+ * Params:
+ *   S = The stream to get the base type of.
+ *
+ * For example, suppose you have the following:
+ * ---
+ * auto base = arrayInputStreamFor!ubyte([1, 2, 3]);
+ * auto wrapped = bufferedInputStreamFor(base);
+ * assert(is(BaseStreamType!(typeof(wrapped)) == ArrayInputStream!ubyte));
+ * ---
+ */
+template BaseStreamType(S) if (isSomeStream!S) {
+    // Note: This works based on the convention that all "wrapper" stream
+    // types have a single member named "stream".
+    static if (__traits(hasMember, S, "stream")) {
+        alias BaseStreamType = BaseStreamType!(typeof(__traits(getMember, S, "stream")));
+    } else {
+        alias BaseStreamType = S;
+    }
+}
+
+unittest {
+    import streams;
+    ubyte[3] data = [1, 2, 3];
+    ArrayInputStream!ubyte baseInputStream = arrayInputStreamFor!ubyte(data);
+    auto wrapped = dataInputStreamFor(bufferedInputStreamFor(baseInputStream));
+    assert(is(BaseStreamType!(typeof(wrapped)) == ArrayInputStream!ubyte));
+    // Check that base types resolve to themselves.
+    assert(is(BaseStreamType!(typeof(baseInputStream)) == ArrayInputStream!ubyte));
+}
+
 /** 
  * Determines if the given stream type is an input stream for reading data of
  * the given type.

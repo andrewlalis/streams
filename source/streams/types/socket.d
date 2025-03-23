@@ -14,7 +14,7 @@ import std.socket;
  * A byte input stream for reading from a socket.
  */
 struct SocketInputStream {
-    private Socket socket;
+    Socket socket;
 
     /** 
      * Receives up to `buffer.length` bytes from the socket, and stores them in
@@ -45,7 +45,7 @@ struct SocketInputStream {
  * A byte output stream for writing to a socket.
  */
 struct SocketOutputStream {
-    private Socket socket;
+    Socket socket;
 
     /** 
      * Writes bytes from `buffer` to the socket.
